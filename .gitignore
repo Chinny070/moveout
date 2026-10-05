@@ -1,0 +1,43 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+keystore.json
+wallet.json
+credentials.json
+secrets.json
+*.mnemonic
+*.seed
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Dependency/build output
+node_modules/
+build/
+dist/
+target/
+coverage/
+.coverage
+*.egg-info/
+
+# Local runtime, logs, and editor state
+.genlayer/
+.genvm/
+.codex/
+.agents/
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
