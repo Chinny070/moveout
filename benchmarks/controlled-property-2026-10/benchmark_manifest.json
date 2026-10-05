@@ -1,7 +1,7 @@
 {
   "dataset_id": "moveout-controlled-property-visual-2026-10",
   "stage": "0.6B",
-  "status": "LOCAL_FIXTURES_READY_HOSTING_PENDING",
+  "status": "ASSETS_PUBLICLY_HOSTED_HASH_VERIFIED",
   "synthetic_controlled": true,
   "real_world_accuracy": "NOT_YET_VERIFIED",
   "generation_tool": "Codex built-in image_gen",
@@ -13,22 +13,22 @@
       1024,
       1536
     ],
-    "crop_method": "Mechanical panel extraction; no pixel retouching. 7 row bands \u00d7 4 photo columns; each adjacent photo pair is one case."
+    "crop_method": "Mechanical panel extraction; no pixel retouching. 7 row bands × 4 photo columns; each adjacent photo pair is one case."
   },
-  "images_hosted": false,
+  "images_hosted": true,
   "cases": [
     {
       "benchmark_id": "MOV-SYN-01",
       "before": {
         "path": "images/case-01-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-01-before.png",
         "sha256": "cc7df2a785d7b89a3321498a699b13551556e0490d472d89307999ad0f61e33b",
         "bytes": 63350,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-01-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-01-after.png",
         "sha256": "d53e22ae9e6d3ed8c92275e2ca96bbee6c337b9bf93d8cf16fe271da1b833a91",
         "bytes": 56848,
         "visual_observation_expected": "ABSENT"
@@ -51,14 +51,14 @@
       "benchmark_id": "MOV-SYN-02",
       "before": {
         "path": "images/case-02-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-02-before.png",
         "sha256": "d9c3639b0a2d4cd48aa1e324c57d198e42f4b7ac9844ac30e1a0149326b1acae",
         "bytes": 55160,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-02-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-02-after.png",
         "sha256": "a96fdcaeadec0ac02f8c96206fec788e9beaa69deb4d7067c6d9958004673bc3",
         "bytes": 51264,
         "visual_observation_expected": "ABSENT"
@@ -81,14 +81,14 @@
       "benchmark_id": "MOV-SYN-03",
       "before": {
         "path": "images/case-03-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-03-before.png",
         "sha256": "a5a54d0ea3731313ab27421347ce7c510624f40d971e2a6697f3dfbb7fb3be7c",
         "bytes": 63050,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-03-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-03-after.png",
         "sha256": "450a4c904e2c48804f64ae23c71436b2bed1459eca06e00afe6c2b5610750e94",
         "bytes": 57897,
         "visual_observation_expected": "PRESENT"
@@ -111,14 +111,14 @@
       "benchmark_id": "MOV-SYN-04",
       "before": {
         "path": "images/case-04-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-04-before.png",
         "sha256": "f5c9b9563adb926ab669c105c427b48d3437dcac2403d72988bc0491d48a6b06",
         "bytes": 58518,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-04-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-04-after.png",
         "sha256": "a6fca017e797383a73493caad65c93cec22a7eab99a6f798454efc580adaf135",
         "bytes": 52763,
         "visual_observation_expected": "PRESENT"
@@ -141,14 +141,14 @@
       "benchmark_id": "MOV-SYN-05",
       "before": {
         "path": "images/case-05-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-05-before.png",
         "sha256": "06d62ce84e7c35abf99378176be794e63636958b3ea2ad15aa14a7812c97d9a6",
         "bytes": 64308,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-05-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-05-after.png",
         "sha256": "be243457cf2fb6fc7f31480280315cc2af0c40a245b5aa3c3ce5fb90ee5db656",
         "bytes": 61738,
         "visual_observation_expected": "PRESENT"
@@ -171,14 +171,14 @@
       "benchmark_id": "MOV-SYN-06",
       "before": {
         "path": "images/case-06-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-06-before.png",
         "sha256": "b2a60da488b0271e80d0d66eb872c8be8f41ee1888f4de1649320d87951a85a1",
         "bytes": 61524,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-06-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-06-after.png",
         "sha256": "db394a54dad8a2732a4d929964db8a82ad4f165c2efeb0b1fd41b6680717ac3f",
         "bytes": 64386,
         "visual_observation_expected": "PRESENT"
@@ -201,14 +201,14 @@
       "benchmark_id": "MOV-SYN-07",
       "before": {
         "path": "images/case-07-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-07-before.png",
         "sha256": "80bbc107113c3412bbbba3ef63c8107e189bb22802bc424e14b6ddd79ca81394",
         "bytes": 66727,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-07-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-07-after.png",
         "sha256": "e783e00fb129e57d46d1d9933fcc33669221ae613658615e2874d75a82ca4aa6",
         "bytes": 60883,
         "visual_observation_expected": "ABSENT"
@@ -231,14 +231,14 @@
       "benchmark_id": "MOV-SYN-08",
       "before": {
         "path": "images/case-08-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-08-before.png",
         "sha256": "09d7b2a2698b9ed4baf7d1d815131d5a19423d8023534618e3ba5456d08210ba",
         "bytes": 65240,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-08-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-08-after.png",
         "sha256": "aad6a123750f03999d94dec5494484f43287a8314d92e62649bc7ab767290e88",
         "bytes": 83947,
         "visual_observation_expected": "UNOBSERVABLE"
@@ -261,14 +261,14 @@
       "benchmark_id": "MOV-SYN-09",
       "before": {
         "path": "images/case-09-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-09-before.png",
         "sha256": "f1a6e1664b0f554ad8de66b97638c4d68aa107c9f55811122cc2f2ce7ace8285",
         "bytes": 63636,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-09-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-09-after.png",
         "sha256": "2da0daa4aa24022e119e8c4b0c3d1402d6fcf45539262a6ed7f5a5687927ad07",
         "bytes": 71662,
         "visual_observation_expected": "UNOBSERVABLE"
@@ -291,14 +291,14 @@
       "benchmark_id": "MOV-SYN-10",
       "before": {
         "path": "images/case-10-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-10-before.png",
         "sha256": "9728b5c4dbaa13bcc5a5d09890f1b51f1dfea874981399808cd395f2fac4003f",
         "bytes": 61665,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-10-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-10-after.png",
         "sha256": "f4f84589be1614fcc25a4550b636f7d2dcd1d73faf3897f13318236b9dfe70e2",
         "bytes": 36893,
         "visual_observation_expected": "UNOBSERVABLE"
@@ -321,14 +321,14 @@
       "benchmark_id": "MOV-SYN-11",
       "before": {
         "path": "images/case-11-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-11-before.png",
         "sha256": "0e2062a87dbb635582eab1033f7f016bd4e141ee16ddf7d2276ffcc09d5dbccf",
         "bytes": 73465,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-11-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-11-after.png",
         "sha256": "1c34165e03977784a86b9e4a54e1aaa2cb1314892cd25194385bfa2a0f9f82d0",
         "bytes": 62779,
         "visual_observation_expected": "ABSENT"
@@ -351,14 +351,14 @@
       "benchmark_id": "MOV-SYN-12",
       "before": {
         "path": "images/case-12-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-12-before.png",
         "sha256": "a7b770e1e1b3cf64b210b2c52fbf10e0e36f71de49e217ea6e3ddb56175f150e",
         "bytes": 68378,
         "visual_observation_expected": "UNCLEAR"
       },
       "after": {
         "path": "images/case-12-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-12-after.png",
         "sha256": "f666f87f96ddcdb786e7cda78fa7cb1c0c1a7a34e20cbcc0d2ffed13a346ff00",
         "bytes": 71040,
         "visual_observation_expected": "UNCLEAR"
@@ -381,14 +381,14 @@
       "benchmark_id": "MOV-SYN-13",
       "before": {
         "path": "images/case-13-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-13-before.png",
         "sha256": "6d947c0dacc1d0ec19225850e8b8628d0ac1c6a5f00d841a0f7bf3183df73e62",
         "bytes": 79956,
         "visual_observation_expected": "PRESENT"
       },
       "after": {
         "path": "images/case-13-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-13-after.png",
         "sha256": "2a6fb0d2a70e2a1c34b663c8e612a10833172416e608a966f00355c297a10dfd",
         "bytes": 80186,
         "visual_observation_expected": "PRESENT"
@@ -411,14 +411,14 @@
       "benchmark_id": "MOV-SYN-14",
       "before": {
         "path": "images/case-14-before.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-14-before.png",
         "sha256": "1c117be82d307f7432091c4146ed62efd8eef82d195b2efc2cad1eb9c1e0040c",
         "bytes": 76130,
         "visual_observation_expected": "ABSENT"
       },
       "after": {
         "path": "images/case-14-after.png",
-        "url": null,
+        "url": "https://raw.githubusercontent.com/Chinny070/moveout/194be2d6c141c76bb9f737ffaaa1fee768c126af/benchmarks/controlled-property-2026-10/images/case-14-after.png",
         "sha256": "caf8b8f9cf9086b10fccb94ab7d84a963ab334c5524c0b313b2fbd27325b4265",
         "bytes": 76827,
         "visual_observation_expected": "ABSENT"
@@ -437,5 +437,6 @@
       },
       "evaluated": false
     }
-  ]
+  ],
+  "asset_commit": "194be2d6c141c76bb9f737ffaaa1fee768c126af"
 }
