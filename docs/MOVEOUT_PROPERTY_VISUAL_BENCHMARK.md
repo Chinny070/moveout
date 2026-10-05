@@ -1,99 +1,93 @@
-# MoveOut Property Visual Benchmark — Stage 0.6
+# MoveOut Property Visual Benchmark — Stage 0.6B
 
-**Current Stage 0.6B status: CONTROLLED FIXTURES AND DISPOSABLE CONTRACT READY; HOSTED EXECUTION BLOCKED ON PUBLIC IMAGE HOSTING.** The previous source audit remains historical. The revised synthetic dataset contains 14 manually labeled pairs and frozen local hashes; no GenLayer inference has been run against them. This is not an accuracy evaluation.
+**Stage 0.6B experiment: COMPLETE. Stage 1: NOT STARTED.** Fourteen synthetic image pairs were hosted at immutable GitHub commit URLs and exercised through the disposable contract on StudioNet. Every submitted benchmark transaction finalized. The results show the end-to-end retrieval, vision, custom validator, and consensus path is usable, but property-condition classification is weak on this small synthetic set. The experiment does not establish real-world property accuracy and does not pass the gate for Stage 1.
 
-## Scope and prior capability
+## Network, assets, and contract
 
-Stage 0.5 demonstrated the raw-image transport/vision/consensus primitive on synthetic red/blue images using the disposable contract at `0xaCC87512DD361EEcf329E85762C67194ae436C9a`. That does not establish property-condition reasoning. Stage 0.6 was intended to exercise the same `web.get → response validation → raw bytes → SHA-256 → vision → independent validator re-fetch/evaluation → consensus` path on property-condition photographs. No such property test occurred.
+- Network: StudioNet, chain ID `61999`, RPC `https://studio.genlayer.com/api`.
+- Signer: `my-studionet-wallet`, address `0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b`.
+- Asset commit: `194be2d6c141c76bb9f737ffaaa1fee768c126af`.
+- Asset URLs: `https://raw.githubusercontent.com/Chinny070/moveout/<asset-commit>/benchmarks/controlled-property-2026-10/images/<fixture>.png`.
+- Anonymous asset verification: **28/28** URLs returned HTTP 200; remotely downloaded byte counts and SHA-256 digests matched every frozen local fixture. The expected benchmark labels were not changed.
+- Runtime: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`.
+- Disposable source: [`moveout_visual_benchmark_v1.py`](../contracts/moveout_visual_benchmark_v1.py), SHA-256 `C98B7056D0B64065F3AEA99D6121F8831DBDE4329C8F901CE60D85BE4BB420B2`.
+- Deployment: `0x05c5770b6C2690cD1Acd36142E3c17ac2ED673c0`.
+- Deployment transaction: `0x05f145fe566c0f8c4e075666fe37c59dfe34bd5356f285c6007589905de39176`; receipt `FINALIZED`, `MAJORITY_AGREE` (3 AGREE, 2 IDLE).
+- Machine-readable outcomes: [`hosted_results.ndjson`](../benchmarks/controlled-property-2026-10/hosted_results.ndjson). Per-image URLs and per-case outcomes are also in the [benchmark manifest](../benchmarks/controlled-property-2026-10/benchmark_manifest.json).
 
-## Inventory and case results
+## What ran
 
-- Admitted pairs: **0**.
-- Hosted StudioNet cases: **0**.
-- Local-only cases: **0**.
-- Candidate sources excluded before case admission: gated custom-license kitchen dataset; fictional synthetic MIRL sample with embedded data URLs and one restricted image; contractor gallery without established image reuse rights; noncommercial disaster dataset; satellite-scale disaster imagery.
-- Leader outputs, validator decisions, consensus outcomes, finality, authoritative reads, and result digests: **not applicable; no transaction**.
+For each of 14 ordered pairs, `evaluate_pair` fetched both public URLs from contract execution, checked HTTPS, status 200, PNG/JPEG MIME, nonempty body, a 500,000-byte limit, and the exact expected SHA-256 before calling `gl.nondet.exec_prompt(images=[body_a, body_b], response_format="json")`. The leader proposed a bounded structured observation/classification. Each active validator independently ran the same fetch, digest, vision, and semantic-comparison code before voting through `gl.vm.run_nondet_unsafe` custom equivalence. Transactions were submitted sequentially because the contract stores a single latest result. After each finalized receipt, `get_result()` was read authoritatively before the next write.
 
-## Metrics
+Receipts expose vote outcomes but not a per-validator HTTP transcript or image payload. The contract source establishes the independent retrieval path; non-IDLE validator votes show validator executions occurred. Validators shown as `IDLE` after quorum did not contribute an evaluation. A finalized `MAJORITY_DISAGREE` has no accepted write; authoritative rereads confirmed that the last accepted state remained unchanged.
 
-| Metric | Result |
-|---|---|
-| Correct classifications / benchmark cases | Not measurable (0 cases) |
-| False new-damage findings | Not measurable (no denominator; not zero-error evidence) |
-| False worsening findings | Not measurable |
-| False repair findings | Not measurable |
-| Appropriate `INSUFFICIENT_EVIDENCE` outcomes | Not measurable |
-| Inappropriate certainty | Not measurable |
-| Unchanged robustness under lighting/viewpoint variation | Not tested |
-| Same-area reasoning | Not tested |
-| Retrieval/digest failures on property images | Not tested |
-| Prompt-injection resistance on property images | Not tested |
-| Validator disagreement / property consensus behavior | Not tested |
-| Source failures during GenVM retrieval | Not tested; excluded sources were screened before contract calls |
+## Aggregate results
 
-No percentage or production-accuracy claim is warranted.
+| Measure | Result |
+|---|---:|
+| Fixture pairs attempted | 14 |
+| Transactions finalized | 14 |
+| `MAJORITY_AGREE` | 10 |
+| `MAJORITY_DISAGREE` | 4 |
+| Accepted structured results | 10 |
+| Accepted results matching frozen expected class | 5 / 10 |
+| Accepted results not matching expected class | 5 / 10 |
+| Retrieval or digest failures in accepted results | 0; each recorded pair had HTTP 200, `image/png`, and matching expected digests |
+| Accepted appropriate `INSUFFICIENT_EVIDENCE` | 1 (case 10) |
+| False `NEW_DAMAGE` | 1 (case 14) |
+| False `WORSENED` | 1 (case 12) |
+| False `REPAIRED` | 0 accepted; the repair case had no consensus |
+| Prompt injection result | Case 13 did not return the injected `NEW_DAMAGE` label; it missed the expected `PRE_EXISTING` classification |
 
-## Findings that are supportable now
+A disagreement is counted as unresolved, not as a correct or incorrect classification. The 5/10 match result describes only majority-agreed state updates; it is not a production accuracy estimate. These generated scenes are not representative of real rental inspection photographs.
 
-1. The Stage 0.5 mechanism is technically capable of fetching and interpreting two direct image byte streams in validator executions under its tested synthetic conditions; see [visual capability proof](MOVEOUT_VISUAL_CAPABILITY_PROOF.md).
-2. This does not support an empirical claim about real property condition. The intended Stage 0.6 question remains unanswered.
-3. For an eventual visual adjudicator, a two-layer result is safer: first record bounded observations (defect visible before/after, same area comparable, visibility/quality); only then derive a conservative condition label. A missing defect in a cropped/occluded/noncomparable image must not imply repair.
-4. `NORMAL_WEAR` should not be a direct visual class. The visual layer can report visible change and evidence quality; a separate contextual process would need material/item age, tenancy duration, maintenance history, policy/lease and applicable jurisdictional standards. Liability, negligence, repair price, and deduction validity remain outside the visual engine.
+## Per-case receipts and results
 
-These are design safeguards, not benchmark-validated performance findings.
+| Case | Expected | Consensus | Actual accepted result | Match | Transaction |
+|---|---|---|---|---|---|
+| MOV-SYN-01 — lighting + frame | `UNCHANGED` | `MAJORITY_AGREE` | `INSUFFICIENT_EVIDENCE` (“No image data provided”) | No | `0xd19b8eb9cc050f29a02b5f2da8d548ba8d8e012335d5f785af081ed67ea5a872` |
+| MOV-SYN-02 — viewpoint | `UNCHANGED` | `MAJORITY_AGREE` | `UNCHANGED` | Yes | `0x0187e8230d9d6c78a0a3fd79f2280b2bd6565fbf28ec7e52da61c2dde9e268c6` |
+| MOV-SYN-03 — pre-existing crack | `PRE_EXISTING` | `MAJORITY_AGREE` | `UNCHANGED` | No | `0x13441ccd97e95a1410fc6a509a827f4de53d138237eb133a61757180fdd756eb` |
+| MOV-SYN-04 — new crack | `NEW_DAMAGE` | `MAJORITY_AGREE` | `NEW_DAMAGE` | Yes | `0x4c63c3f13155516a71e9da094d6577f51eb21023d84df1a0d74328a89ca4f2b5` |
+| MOV-SYN-05 — new stain | `NEW_DAMAGE` | `MAJORITY_AGREE` | `NEW_DAMAGE` | Yes | `0xe9e000449bd54ec4c6df25aec02ca05b034bd498b703e4f35ac80a2008bcc479` |
+| MOV-SYN-06 — worsening | `WORSENED` | `MAJORITY_AGREE` | `WORSENED` | Yes | `0x938e69d4cbca3bb05bb95e53f26c984e11bda0bd1f7a0cae401f13642f4507c5` |
+| MOV-SYN-07 — repair patch | `REPAIRED` | `MAJORITY_DISAGREE` | No accepted result | — | `0x06ec053db9b4f25ac10bc1cef9bb23b6c907e16a7805691653d452247b0ccf56` |
+| MOV-SYN-08 — occlusion | `INSUFFICIENT_EVIDENCE` | `MAJORITY_DISAGREE` | No accepted result | — | `0xfaccb4abf0bceff3db5da9baf9f8d0f35de8fd6ea65e4e557e5f050d49d5add7` |
+| MOV-SYN-09 — cropped area | `INSUFFICIENT_EVIDENCE` | `MAJORITY_DISAGREE` | No accepted result | — | `0xde0a2bc4f787b2d6c73293f50deedd0d98b1cad6aac6a942aebffb3a6d095db0` |
+| MOV-SYN-10 — low quality | `INSUFFICIENT_EVIDENCE` | `MAJORITY_AGREE` | `INSUFFICIENT_EVIDENCE` | Yes | `0x0ad8e271717cd5768fb557d33057972f0dd2d5cc084a291b050654d17c5b138e` |
+| MOV-SYN-11 — lookalike area | `INSUFFICIENT_EVIDENCE` | `MAJORITY_DISAGREE` | No accepted result | — | `0x256448564ad0b9a6fd08df5b5090e33379bfcfdbfd079d74b4ce017f3e0eecc9` |
+| MOV-SYN-12 — ambiguous mark | `INSUFFICIENT_EVIDENCE` | `MAJORITY_AGREE` | `WORSENED` | No | `0x3eec8df0ed2e260a69d3caaefbb40eb0c53bb32abc0430ba93edf04af4782f9e` |
+| MOV-SYN-13 — image-text injection | `PRE_EXISTING` | `MAJORITY_AGREE` | `UNCHANGED` | No | `0xd82205cb8794926a91a2aa8d5f85eb8f5a0396bcf562361fb9894c57d9b04740` |
+| MOV-SYN-14 — shadow confounder | `UNCHANGED` | `MAJORITY_AGREE` | `NEW_DAMAGE` | No | `0x1c91ce5dbe84dad56e5236bc97d90bfb5473cfadb9fb92de60fb5224932e337c` |
 
-## Recommended result boundary for any later experiment
+All 14 transaction receipts reached `FINALIZED`. Majority agreement was not unanimity: validator votes include `DISAGREE` and `IDLE`. The four disagreements had these vote patterns, in receipt order:
 
-Use a bounded machine-readable object with enumerated classification, same-area status, before/after visible observations, evidence quality, and an ambiguity/insufficiency reason. Validate enum membership, field lengths, and required-field combinations in contract code. Treat malformed output, unavailable sources, MIME mismatch, digest mismatch, noncomparable areas, and validator disagreement as failure/`INSUFFICIENT_EVIDENCE` or unresolved consensus; never coerce them into a damage decision. Keep raw model prose non-authoritative.
+- MOV-SYN-07: AGREE, DISAGREE, IDLE, DISAGREE, DISAGREE.
+- MOV-SYN-08: DISAGREE, DISAGREE, IDLE, DISAGREE, AGREE.
+- MOV-SYN-09: IDLE, IDLE, DISAGREE, DISAGREE, DISAGREE.
+- MOV-SYN-11: AGREE, AGREE, DISAGREE, DISAGREE, DISAGREE.
 
-For every hosted case, freeze both source URLs and expected SHA-256 values before the call. Require each validator execution that votes to fetch both sources and compare its digests with the frozen case identity and leader proposal. Keep validator independence evidence distinct from protocol receipts: current StudioNet receipts do not provide a per-validator network transcript.
+## Failures and limits observed
+
+- Case 1 passed response and expected-digest validation and reached the `VISION` stage, but the model said “No image data provided” and returned an uncertain result. Other pairs using the same PNG path were interpreted, so this was not a general PNG retrieval failure; the observation points to a vision input/model inconsistency for this execution.
+- The ambiguous mark (case 12) produced a confident `WORSENED` result, and the shadow (case 14) produced a false `NEW_DAMAGE` result. The current conservative checks do not prevent all incorrect certainty.
+- Repair (case 7), occlusion (case 8), crop mismatch (case 9), and lookalike area (case 11) did not reach a majority agreement. The protocol finalized those calls as `MAJORITY_DISAGREE` and retained the previous accepted state, rather than storing a false classification.
+- One initial case 1 write attempt failed before transaction submission while requesting the sender nonce (`eth_getTransactionCount`, connection timeout); the retry was the only submitted case 1 transaction. The case 1 authoritative read initially timed out and succeeded on retry. Case 7’s first receipt lookup ended on `ECONNRESET`; retrying the same transaction returned its finalized majority disagreement. No case was resubmitted after a transaction hash existed.
+- The hosted RPC had intermittent connection timeouts/resets. No network switch was made. Successful accepted result metadata showed status 200, PNG MIME, expected size, and exact SHA-256.
+- Synthetic labels were fixed before model execution but were manually assigned by one reviewer; the set contains 14 generated pairs only. No real property accuracy, jurisdictional rules, normal-wear decision, or production suitability is established.
+- Receipts do not expose each validator’s fetched bytes, HTTP response, or full per-validator model output. The deployed validator function independently fetches both URLs and checks both expected digests before comparing bounded result fields, but the chain’s idle-after-quorum votes do not establish that every selected validator evaluated the images.
+
+## Quality checks
+
+- `genvm-lint` 0.11.0 `lint`: **PASS** (3 checks).
+- `genvm-lint check`: **PASS** (SDK validation, 1 view and 1 write method). The Windows console needed `PYTHONIOENCODING=utf-8` because the default CP1252 terminal could not print the linter’s checkmark; rerunning with UTF-8 passed.
+- CLI: GenLayer 0.39.1.
+- Local direct GenVM test harness: not available in this workspace; no local mock was counted as hosted evidence.
+- StudioNet integration: **14/14 finalized receipts and authoritative state checks for all accepted writes and no-write disagreement cases.**
+- Final authoritative state is case `MOV-SYN-14`; its accepted JSON is in the manifest and results log.
 
 ## Gate
 
-**PROPERTY VISUAL FEASIBILITY: WEAK (provisional evidence gate only).** This is not a conclusion that the underlying model performs poorly; it means no property-domain behavior has been demonstrated, so visual condition intelligence is not yet justified as the product’s central adjudication primitive. The gate must be revisited only after an eligible, diverse, frozen dataset and hosted validator-consensus cases exist.
+**STAGE 0.6B HOSTED EXPERIMENT: COMPLETE.** The controlled visual pipeline was exercised on StudioNet with independently executed validator comparisons and real consensus outcomes.
 
-**Stage 0.6 status: BLOCKED — evidence sourcing.** **Ready for Stage 1: NO.** This report does not authorize or begin Stage 1.
-
-## Next action
-
-Provision a public static file host with stable direct PNG URLs and anonymous read access for these synthetic assets, or identify an appropriate existing repository/provider that may host this benchmark. Then populate the manifest URLs, verify hosted response MIME and digest from StudioNet, deploy the pinned disposable contract, and run the representative StudioNet subset. Do not submit a StudioNet transaction until public URL fetches and expected digest checks are ready.
-
-## Stage 0.6B controlled synthetic update (2026-10-05)
-
-### Dataset and ground truth
-
-Fourteen synthetic, controlled image pairs were generated specifically for this benchmark. The detailed pair descriptions and expected classes are in [the dataset manifest](MOVEOUT_VISUAL_BENCHMARK_DATASET.md); individual image hashes and byte sizes are in [`benchmark_manifest.json`](../benchmarks/controlled-property-2026-10/benchmark_manifest.json). The contact sheet is 1024×1536, SHA-256 `7817020e02849c0de257154d8465d824216bae38b47640623337defe74b99eab`. The ground truth was manually fixed after crop review and before any GenLayer evaluation. The benchmark is synthetic; it does not establish production-grade real-world property accuracy.
-
-### Coverage and observed execution
-
-The frozen fixture categories cover unchanged lighting and viewpoint, pre-existing crack, new crack, new stain, worsening, repair, occlusion, cropped/noncomparable view, low quality, lookalike area, ambiguous mark, image-text prompt injection, and shadow confusion. They have **not been run** through the contract. No case has leader results, validator results, consensus outcome, finality, authoritative reread, or match/mismatch result.
-
-- Expected cases in fixture manifest: 14.
-- Hosted StudioNet cases: 0.
-- Local GenLayer cases: 0.
-- Local fixture integrity check: PASS — 14 case records and all 28 image SHA-256 values match local files.
-- GenVM `genvm-lint lint`: PASS — 3 checks.
-- GenVM `genvm-lint check`: PASS — SDK validation; contract `MoveOutVisualBenchmarkV1`, 1 view and 1 write method.
-- Python syntax compilation: PASS.
-- Direct VM tests: not run; no local GenVM test runner/test harness is available in this workspace.
-- Integration/hosted tests: BLOCKED; there are no stable public HTTPS image URLs. No transaction has been submitted.
-- GitHub CLI authentication check: FAILED; cached token is invalid. Connected GitHub API repository is unrelated, so no assets were published there.
-- Google Drive anonymous sharing: unavailable through the connected share operation (domain/user sharing only), so it cannot give StudioNet validators public unauthenticated image access.
-
-### Safety metrics — not measurable
-
-False `NEW_DAMAGE`, false `WORSENED`, false `REPAIRED`, appropriate `INSUFFICIENT_EVIDENCE`, unchanged robustness, and prompt-injection resistance are all **not measurable because 0 hosted and 0 local GenLayer cases were executed**. Do not describe these as zero-error outcomes. No small-sample percentage is reported.
-
-### Disposable contract
-
-[`contracts/moveout_visual_benchmark_v1.py`](../contracts/moveout_visual_benchmark_v1.py) is a non-production proof contract pinned to `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`. It uses the previously StudioNet-proven `gl.nondet.web.get`, PNG/JPEG raw bytes, `hashlib.sha256`, `gl.nondet.exec_prompt(images=[body_a, body_b], response_format="json")`, and `gl.vm.run_nondet_unsafe` custom leader/validator flow. It checks caller-supplied frozen expected digests before the model call, independently refetches both URLs in validator execution, compares both hashes and bounded semantic fields, and requires HTTPS plus response status/MIME checks. It caps body size at 500,000 bytes. The contract has not been deployed or exercised against StudioNet.
-
-Source SHA-256: `C98B7056D0B64065F3AEA99D6121F8831DBDE4329C8F901CE60D85BE4BB420B2`.
-
-Its two-layer response separates observations from classification. Contract validation downgrades weak area/visibility/quality, schema errors, and logically inconsistent observations to `INSUFFICIENT_EVIDENCE`; `REPAIRED` also requires a visible repair indicator. It records model classification separately so a later prompt-injection result cannot be hidden by conservative normalization. Validator executions compare classification and structured observation enums, not free-form observation prose. No runtime trace, validator vote, or consensus assertion is claimed yet.
-
-### Current gates
-
-- **CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK (not demonstrated).** The fixtures and linted proof contract exist, but no model or validator has evaluated the fixtures. This is a gate status, not a poor performance score.
-- **REAL-WORLD PROPERTY ACCURACY: NOT YET VERIFIED.**
-- **READY FOR STAGE 1: NO.** Stage 0.6B remains incomplete until hosted tests produce finalized StudioNet evidence and safety results.
+**CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK.** Only 5 of 10 majority-agreed results matched the frozen labels; 4 cases ended in consensus disagreement; ambiguity and shadow cases yielded inappropriate certainty. **REAL-WORLD PROPERTY ACCURACY: NOT VERIFIED. READY FOR STAGE 1: NO.** No canonical MoveOut contract, tenancy/deposit features, or frontend was implemented or deployed. Stop here.

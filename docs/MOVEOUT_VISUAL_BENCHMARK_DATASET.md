@@ -1,6 +1,6 @@
 # MoveOut Visual Benchmark Dataset — Stage 0.6
 
-**Current Stage 0.6B status: 14 SYNTHETIC LOCAL FIXTURES READY; HOSTED EVALUATION BLOCKED ON PUBLIC HOSTING.** All 14 before/after cases have manually reviewed expected visual labels and SHA-256 values frozen in [`benchmark_manifest.json`](../benchmarks/controlled-property-2026-10/benchmark_manifest.json). Every hosted URL is still null. No case has been evaluated by GenLayer. The source audit below is the historical Stage 0.6A record; the revised synthetic sourcing strategy supersedes its no-cases status.
+**Current Stage 0.6B status: HOSTED STUDIONET EVALUATION COMPLETE.** The 14 synthetic pairs have frozen labels and SHA-256 values in [`benchmark_manifest.json`](../benchmarks/controlled-property-2026-10/benchmark_manifest.json). All 28 image URLs are pinned to asset commit `194be2d6c141c76bb9f737ffaaa1fee768c126af`, anonymously retrievable, and byte-for-byte hash verified. All 14 benchmark transactions finalized on StudioNet; see the [evaluation report](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md) and [`hosted_results.ndjson`](../benchmarks/controlled-property-2026-10/hosted_results.ndjson). Stage 0.6A source-audit details below are historical.
 
 ## Admission rules
 
@@ -18,11 +18,11 @@ An admitted pair must (1) show the same identifiable property area/item across t
 
 ## Stage 0.6A admission result (historical)
 
-Stage 0.6A admitted none. Stage 0.6B's controlled synthetic cases are listed below; there remain no hosted evidence transactions.
+Stage 0.6A admitted none. Stage 0.6B later admitted this controlled synthetic fixture set and now has hosted StudioNet results; the no-case conclusion applies only to the earlier source audit.
 
 ## Stage 0.6A category coverage result (historical)
 
-All remain **untested**: UNCHANGED, PRE_EXISTING, NEW_DAMAGE, WORSENED, REPAIRED, lighting variation, viewpoint variation, occlusion, low quality, ambiguity, same-area matching, prompt injection, normal wear. The sourcing review establishes only why candidate sources were excluded; it does not establish visual model behavior.
+For the historical 0.6A source-audit stage, all categories were untested. The 0.6B hosted results cover the synthetic categories listed below; normal wear remains outside the experiment. See the result table and limitations in the evaluation report.
 
 ## Stage 0.6B controlled synthetic fixtures
 
@@ -51,7 +51,7 @@ Per-case layer-1 values (`same_area_visible`, defect presence before/after, seve
 
 ### Hosting state
 
-Before images and after images have SHA-256 hashes in the manifest, but there are no public HTTPS URLs. The connected Drive sharing tool cannot grant anonymous public access. The authenticated GitHub CLI token is invalid, and the only connected GitHub API repository is unrelated; we did not publish benchmark assets there. Therefore the required validator retrieval path cannot yet be exercised. The fixture source and source hashes are local; they are not hosted proof.
+The 28 PNG fixtures are hosted at commit-pinned `raw.githubusercontent.com` URLs in the manifest. Anonymous retrieval returned HTTP 200 for all 28 files, and each remotely downloaded byte count and SHA-256 matched the frozen local fixture. The asset commit is `194be2d6c141c76bb9f737ffaaa1fee768c126af`. StudioNet fetched both inputs for accepted results with status 200, `image/png`, and matching expected digests. Four cases finalized as `MAJORITY_DISAGREE`; those calls retained the previous accepted contract state instead of storing a result. The hosted run and all transaction outcomes are documented in [MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md).
 
 ## Stage 0.6A evidence recommendation (historical; superseded)
 

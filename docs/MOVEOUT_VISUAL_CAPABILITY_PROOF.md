@@ -1,6 +1,6 @@
 # MoveOut Visual Capability Proof — Stage 0.5
 
-> **Current Stage 0.6B addendum:** A controlled synthetic benchmark of 14 pairs now exists locally; its disposable contract passes `genvm-lint lint` and `genvm-lint check`. Public direct-image hosting is still unavailable, so no Stage 0.6B GenLayer transaction, validator evaluation, or hosted result exists. See [property visual benchmark](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md) and [dataset manifest](MOVEOUT_VISUAL_BENCHMARK_DATASET.md). Stage 0.5 evidence below is unchanged and must not be mistaken for property-condition validation.
+> **Stage 0.6B addendum:** The 14-pair controlled synthetic benchmark has now run on StudioNet. All 14 transactions finalized; 10 reached `MAJORITY_AGREE` and 4 `MAJORITY_DISAGREE`. Five of the ten accepted classifications matched frozen labels. This result is weak feasibility evidence and does not establish real-world property accuracy. The Stage 0.5 proof below remains unchanged. See [Stage 0.6B results](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md) and [dataset manifest](MOVEOUT_VISUAL_BENCHMARK_DATASET.md).
 
 **Stage:** Stage 0.5 only  
 **Current result:** Direct image-byte mechanism **VERIFIED** for a two-PNG comparison and single-image PNG/JPEG vision on StudioNet. **MoveOut damage-condition policy remains unverified.**  
@@ -205,13 +205,13 @@ An audit of candidate sources found no image set admitted under the Stage 0.6 cr
 - MIRL Aftermath’s repository README describes six generated fictional heritage images under an MIT-licensed sample project, but the sample is not residential inspection photography, its image content is embedded in dossier JSON as data URLs rather than documented standalone image URLs, and one before image is explicitly marked restricted. No image was used.
 - A commercial foundation-repair gallery lacks established open image-reuse rights; a street-view damage dataset is labeled CC BY-NC; disaster satellite imagery is not a valid proxy for room-level rental inspection. None was used.
 
-At the end of Stage 0.6A there were **0 admitted cases**. Stage 0.6B now has 14 local-only synthetic cases but still 0 hosted cases and 0 GenLayer evaluations. There are no Stage 0.6B leader results, validator outcomes, consensus receipts, finality records, authoritative rereads, or StudioNet property-image digests. False-positive/negative, uncertainty, same-area, lighting/viewpoint, prompt-injection, and normal-wear metrics remain unmeasured, not zero. See [benchmark dataset/source audit](MOVEOUT_VISUAL_BENCHMARK_DATASET.md) and [Stage 0.6 evaluation report](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md).
+At the end of Stage 0.6A there were **0 admitted cases**. That no-case source audit was superseded by the Stage 0.6B controlled synthetic dataset and hosted evaluation. The 0.6B transactions, consensus, finality, authoritative reads, and measured synthetic results are documented in [the Stage 0.6 evaluation report](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md).
 
-**Provisional feasibility gate: WEAK as an evidence gate only**—no property-domain behavior has been demonstrated. This must not be interpreted as a measured poor model score or as permission to proceed to Stage 1. Ready for Stage 1 remains **NO**. The next requirement is a rights-cleared, publicly fetchable, diverse paired property-image manifest suitable for remote evaluator/model access.
+**Historical Stage 0.6A result:** no real-source property pairs were admitted. Stage 0.6B later established controlled synthetic behavior only; it does not demonstrate real-world accuracy or authorize Stage 1.
 
 ## Stage 0.6B — controlled synthetic fixture package (2026-10-05)
 
-The Stage 0.6A real-source blocker prompted a revised synthetic strategy. A 1024×1536 source contact sheet was created with the built-in image-generation tool, then mechanically cropped into 28 PNG fixtures (14 ordered pairs) with no image retouching. Contact-sheet SHA-256: `7817020e02849c0de257154d8465d824216bae38b47640623337defe74b99eab`. The per-image SHA-256 digests, expected labels, layer-1 ground truth, and local paths are frozen in [`benchmarks/controlled-property-2026-10/benchmark_manifest.json`](../benchmarks/controlled-property-2026-10/benchmark_manifest.json). The full-size/crop files are locally available; all manifest public URLs remain null.
+The Stage 0.6A real-source blocker prompted a revised synthetic strategy. A 1024×1536 source contact sheet was created with the built-in image-generation tool, then mechanically cropped into 28 PNG fixtures (14 ordered pairs) with no image retouching. Contact-sheet SHA-256: `7817020e02849c0de257154d8465d824216bae38b47640623337defe74b99eab`. The per-image SHA-256 digests, expected labels, layer-1 ground truth, local paths, and commit-pinned public URLs are frozen in [`benchmarks/controlled-property-2026-10/benchmark_manifest.json`](../benchmarks/controlled-property-2026-10/benchmark_manifest.json). The 28 raw GitHub URLs were anonymously retrieved and every remote SHA-256 matched the local fixture.
 
 The cases cover two unchanged variations, pre-existing crack, new crack, new stain, worsening, visible patch/repair, occlusion, cropped/noncomparable area, dark/blurred evidence, lookalike area, ambiguous mark, instruction text embedded in an image, and a shadow that resembles a defect. The prompt explicitly treats all visible text as untrusted evidence. Ground truth was set after visual inspection and before any GenLayer call. The dataset is synthetic and controlled; it does not establish real-world property accuracy.
 
@@ -223,16 +223,16 @@ New source: [`contracts/moveout_visual_benchmark_v1.py`](../contracts/moveout_vi
 - `genvm-lint check`: PASS (SDK validation; 1 write and 1 view method).
 - `python -m py_compile`: PASS.
 - Local fixture integrity check: PASS (14 records; 28 SHA-256 values match local bytes).
-- Local GenVM/direct tests: not run; no direct test runner/harness is configured in this workspace.
-- Hosted/integration tests: not run. No transaction or contract deployment was submitted.
+- Local GenVM/direct tests: no direct test runner or harness is configured; no local mock was counted as proof.
+- Hosted/integration tests: 14/14 StudioNet transactions finalized; accepted state writes were reread authoritatively, and disagreement cases were verified not to change the last accepted state. See [the Stage 0.6 evaluation report](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md) and [`hosted_results.ndjson`](../benchmarks/controlled-property-2026-10/hosted_results.ndjson).
 
-### Why hosted execution stopped
+### Hosting and completed StudioNet evaluation
 
-The current connected Drive sharing operation only exposes domain/user grants, not anonymous public read, so Drive URLs cannot be relied upon by StudioNet validators. The authenticated GitHub CLI credential is invalid; the GitHub API connector exposes only an unrelated repository, and assets were not published there. Sites hosting is for website publication, while this request requires standalone asset hosting. No suitable authorized public asset repository/provider is configured. Consequently none of the stable HTTPS URLs required by `gl.nondet.web.get` exist yet; submitting a benchmark transaction now would only fail before the visual comparison.
+The project was pushed to `https://github.com/Chinny070/moveout` using normal noninteractive Git authentication. The 28 image assets are pinned to commit `194be2d6c141c76bb9f737ffaaa1fee768c126af`; anonymous raw URL retrieval and SHA-256 parity passed for every fixture. The hosted benchmark completed on the requested StudioNet and signer. Its receipt outcomes and limitations are summarized in [MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md](MOVEOUT_PROPERTY_VISUAL_BENCHMARK.md).
 
 ### Current classification
 
-**CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK (not demonstrated).** No model or validator evaluated the 14 fixtures, so the safety metrics are not measurable and must not be reported as zero false positives. **REAL-WORLD PROPERTY ACCURACY: NOT YET VERIFIED.** Stage 0.6B is incomplete, and Ready for Stage 1 is **NO**. No canonical MoveOut code or deployment was touched.
+**STAGE 0.6B HOSTED EXPERIMENT: COMPLETE. CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK.** Ten of fourteen cases reached majority agreement; five of those ten matched frozen labels, and four transactions finalized as majority disagreement. The ambiguity and shadow cases produced incorrect damage classifications. **REAL-WORLD PROPERTY ACCURACY: NOT VERIFIED. READY FOR STAGE 1: NO.** No canonical MoveOut code or deployment was touched.
 
 No source was deliberately mutated between leader and validator executions. The successful same-digest votes demonstrate that the tested static URLs were byte-identical across the participating retrievals at that time; they do not guarantee future URL immutability. For MoveOut, store the source URL and SHA-256 (and optionally MIME/size) as part of an evidence record, reject validators whose digest differs, and prefer immutable/content-addressed or contract-submitted evidence when feasible. Do not treat URL alone or HTTP MIME as provenance: redirects can obscure the final location, a MIME header can lie, and remote content can later change.
 

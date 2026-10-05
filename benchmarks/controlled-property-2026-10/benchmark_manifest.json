@@ -1,7 +1,7 @@
 {
   "dataset_id": "moveout-controlled-property-visual-2026-10",
   "stage": "0.6B",
-  "status": "ASSETS_PUBLICLY_HOSTED_HASH_VERIFIED",
+  "status": "HOSTED_STUDIONET_EVALUATION_COMPLETE",
   "synthetic_controlled": true,
   "real_world_accuracy": "NOT_YET_VERIFIED",
   "generation_tool": "Codex built-in image_gen",
@@ -45,7 +45,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0xd19b8eb9cc050f29a02b5f2da8d548ba8d8e012335d5f785af081ed67ea5a872",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": "'AGREE','DISAGREE','AGREE','DISAGREE','AGREE'",
+        "actual_classification": "INSUFFICIENT_EVIDENCE",
+        "label_match": false,
+        "result": {
+          "ambiguity_reason": "AREA",
+          "case_id": "MOV-SYN-01",
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "defect_present_after": "UNOBSERVABLE",
+          "defect_present_before": "UNOBSERVABLE",
+          "defect_severity_changed": "UNKNOWN",
+          "expected_digest_match": true,
+          "image_quality_sufficient": false,
+          "metadata": {
+            "b": {
+              "size": 56848,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "d53e22ae9e6d3ed8c92275e2ca96bbee6c337b9bf93d8cf16fe271da1b833a91"
+            },
+            "a": {
+              "size": 63350,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "cc7df2a785d7b89a3321498a699b13551556e0490d472d89307999ad0f61e33b"
+            }
+          },
+          "model_classification": "INSUFFICIENT_EVIDENCE",
+          "observations": [
+            "No image data provided.",
+            "Cannot assess area or defects."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "UNCLEAR",
+          "stage": "VISION",
+          "visibility_sufficient": false
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-02",
@@ -75,7 +118,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x0187e8230d9d6c78a0a3fd79f2280b2bd6565fbf28ec7e52da61c2dde9e268c6",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": "'AGREE','DISAGREE','AGREE','DISAGREE','AGREE'",
+        "actual_classification": "UNCHANGED",
+        "label_match": true,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-02",
+          "classification": "UNCHANGED",
+          "defect_present_after": "ABSENT",
+          "defect_present_before": "ABSENT",
+          "defect_severity_changed": "UNCHANGED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "b": {
+              "size": 51264,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "a96fdcaeadec0ac02f8c96206fec788e9beaa69deb4d7067c6d9958004673bc3"
+            },
+            "a": {
+              "size": 55160,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "d9c3639b0a2d4cd48aa1e324c57d198e42f4b7ac9844ac30e1a0149326b1acae"
+            }
+          },
+          "model_classification": "UNCHANGED",
+          "observations": [
+            "The wall area and furniture are identical in both images.",
+            "No visible defects or changes are present between the before and after photos."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-03",
@@ -105,7 +191,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x13441ccd97e95a1410fc6a509a827f4de53d138237eb133a61757180fdd756eb",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": "'AGREE','AGREE','AGREE','DISAGREE','IDLE'",
+        "actual_classification": "UNCHANGED",
+        "label_match": false,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-03",
+          "classification": "UNCHANGED",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "PRESENT",
+          "defect_severity_changed": "UNCHANGED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "b": {
+              "size": 57897,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "450a4c904e2c48804f64ae23c71436b2bed1459eca06e00afe6c2b5610750e94"
+            },
+            "a": {
+              "size": 63050,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "a5a54d0ea3731313ab27421347ce7c510624f40d971e2a6697f3dfbb7fb3be7c"
+            }
+          },
+          "model_classification": "UNCHANGED",
+          "observations": [
+            "Vertical wall crack visible in both images.",
+            "No visible patch or material change in after image."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-04",
@@ -135,7 +264,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x4c63c3f13155516a71e9da094d6577f51eb21023d84df1a0d74328a89ca4f2b5",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": "'AGREE','IDLE','AGREE','IDLE','AGREE'",
+        "actual_classification": "NEW_DAMAGE",
+        "label_match": true,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-04",
+          "classification": "NEW_DAMAGE",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "ABSENT",
+          "defect_severity_changed": "INCREASED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "b": {
+              "size": 52763,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "a6fca017e797383a73493caad65c93cec22a7eab99a6f798454efc580adaf135"
+            },
+            "a": {
+              "size": 58518,
+              "content_type": "image/png",
+              "status": 200,
+              "mime": "image/png",
+              "sha256": "f5c9b9563adb926ab669c105c427b48d3437dcac2403d72988bc0491d48a6b06"
+            }
+          },
+          "model_classification": "NEW_DAMAGE",
+          "observations": [
+            "A large vertical crack is visible on the wall in the after photo.",
+            "The wall appears undamaged in the before photo."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-05",
@@ -165,7 +337,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0xe9e000449bd54ec4c6df25aec02ca05b034bd498b703e4f35ac80a2008bcc479",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'IDLE', 'AGREE', 'AGREE', 'AGREE', 'IDLE' ",
+        "actual_classification": "NEW_DAMAGE",
+        "label_match": true,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-05",
+          "classification": "NEW_DAMAGE",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "ABSENT",
+          "defect_severity_changed": "INCREASED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "06d62ce84e7c35abf99378176be794e63636958b3ea2ad15aa14a7812c97d9a6",
+              "size": 64308,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "be243457cf2fb6fc7f31480280315cc2af0c40a245b5aa3c3ce5fb90ee5db656",
+              "size": 61738,
+              "status": 200
+            }
+          },
+          "model_classification": "NEW_DAMAGE",
+          "observations": [
+            "Clean wall in A, large stain in B",
+            "Same corner and furniture visible"
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-06",
@@ -195,7 +410,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x938e69d4cbca3bb05bb95e53f26c984e11bda0bd1f7a0cae401f13642f4507c5",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'AGREE', 'IDLE', 'AGREE', 'IDLE', 'AGREE' ",
+        "actual_classification": "WORSENED",
+        "label_match": true,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-06",
+          "classification": "WORSENED",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "PRESENT",
+          "defect_severity_changed": "INCREASED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "b2a60da488b0271e80d0d66eb872c8be8f41ee1888f4de1649320d87951a85a1",
+              "size": 61524,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "db394a54dad8a2732a4d929964db8a82ad4f165c2efeb0b1fd41b6680717ac3f",
+              "size": 64386,
+              "status": 200
+            }
+          },
+          "model_classification": "WORSENED",
+          "observations": [
+            "A hairline vertical crack is visible on the wall in the before photo.",
+            "The crack has significantly widened and lengthened in the after photo."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-07",
@@ -225,7 +483,16 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x06ec053db9b4f25ac10bc1cef9bb23b6c907e16a7805691653d452247b0ccf56",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_DISAGREE",
+        "validator_votes": "'AGREE','DISAGREE','IDLE','DISAGREE','DISAGREE'",
+        "actual_classification": null,
+        "label_match": null,
+        "result": null
+      }
     },
     {
       "benchmark_id": "MOV-SYN-08",
@@ -255,7 +522,16 @@
         "visibility_sufficient": false,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0xfaccb4abf0bceff3db5da9baf9f8d0f35de8fd6ea65e4e557e5f050d49d5add7",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_DISAGREE",
+        "validator_votes": " 'DISAGREE', 'DISAGREE', 'IDLE', 'DISAGREE', 'AGREE' ",
+        "actual_classification": null,
+        "label_match": null,
+        "result": null
+      }
     },
     {
       "benchmark_id": "MOV-SYN-09",
@@ -285,7 +561,16 @@
         "visibility_sufficient": false,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0xde0a2bc4f787b2d6c73293f50deedd0d98b1cad6aac6a942aebffb3a6d095db0",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_DISAGREE",
+        "validator_votes": " 'IDLE', 'IDLE', 'DISAGREE', 'DISAGREE', 'DISAGREE' ",
+        "actual_classification": null,
+        "label_match": null,
+        "result": null
+      }
     },
     {
       "benchmark_id": "MOV-SYN-10",
@@ -315,7 +600,50 @@
         "visibility_sufficient": false,
         "image_quality_sufficient": false
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x0ad8e271717cd5768fb557d33057972f0dd2d5cc084a291b050654d17c5b138e",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'IDLE', 'AGREE', 'AGREE', 'DISAGREE', 'AGREE' ",
+        "actual_classification": "INSUFFICIENT_EVIDENCE",
+        "label_match": true,
+        "result": {
+          "ambiguity_reason": "OCCLUDED",
+          "case_id": "MOV-SYN-10",
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "defect_present_after": "UNOBSERVABLE",
+          "defect_present_before": "ABSENT",
+          "defect_severity_changed": "UNKNOWN",
+          "expected_digest_match": true,
+          "image_quality_sufficient": false,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "9728b5c4dbaa13bcc5a5d09890f1b51f1dfea874981399808cd395f2fac4003f",
+              "size": 61665,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "f4f84589be1614fcc25a4550b636f7d2dcd1d73faf3897f13318236b9dfe70e2",
+              "size": 36893,
+              "status": 200
+            }
+          },
+          "model_classification": "INSUFFICIENT_EVIDENCE",
+          "observations": [
+            "Before image shows a clear bedroom wall and baseboard.",
+            "After image is too blurred/dark to assess wall condition."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": false
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-11",
@@ -345,7 +673,16 @@
         "visibility_sufficient": false,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x256448564ad0b9a6fd08df5b5090e33379bfcfdbfd079d74b4ce017f3e0eecc9",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_DISAGREE",
+        "validator_votes": " 'AGREE', 'AGREE', 'DISAGREE', 'DISAGREE', 'DISAGREE' ",
+        "actual_classification": null,
+        "label_match": null,
+        "result": null
+      }
     },
     {
       "benchmark_id": "MOV-SYN-12",
@@ -375,7 +712,50 @@
         "visibility_sufficient": false,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x3eec8df0ed2e260a69d3caaefbb40eb0c53bb32abc0430ba93edf04af4782f9e",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'AGREE', 'AGREE', 'IDLE', 'AGREE', 'IDLE' ",
+        "actual_classification": "WORSENED",
+        "label_match": false,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-12",
+          "classification": "WORSENED",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "PRESENT",
+          "defect_severity_changed": "INCREASED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "a7b770e1e1b3cf64b210b2c52fbf10e0e36f71de49e217ea6e3ddb56175f150e",
+              "size": 68378,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "f666f87f96ddcdb786e7cda78fa7cb1c0c1a7a34e20cbcc0d2ffed13a346ff00",
+              "size": 71040,
+              "status": 200
+            }
+          },
+          "model_classification": "WORSENED",
+          "observations": [
+            "Wall scuff/mark is visible in both images.",
+            "After image shows a larger/darker marked area with a longer streak."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-13",
@@ -405,7 +785,50 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0xd82205cb8794926a91a2aa8d5f85eb8f5a0396bcf562361fb9894c57d9b04740",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'AGREE', 'IDLE', 'IDLE', 'AGREE', 'AGREE' ",
+        "actual_classification": "UNCHANGED",
+        "label_match": false,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-13",
+          "classification": "UNCHANGED",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "PRESENT",
+          "defect_severity_changed": "UNCHANGED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "6d947c0dacc1d0ec19225850e8b8628d0ac1c6a5f00d841a0f7bf3183df73e62",
+              "size": 79956,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "2a6fb0d2a70e2a1c34b663c8e612a10833172416e608a966f00355c297a10dfd",
+              "size": 80186,
+              "status": 200
+            }
+          },
+          "model_classification": "UNCHANGED",
+          "observations": [
+            "Same bedroom wall is visible in both images.",
+            "Vertical wall crack appears in both before and after with similar extent."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     },
     {
       "benchmark_id": "MOV-SYN-14",
@@ -435,8 +858,67 @@
         "visibility_sufficient": true,
         "image_quality_sufficient": true
       },
-      "evaluated": false
+      "evaluated": true,
+      "hosted_result": {
+        "transaction": "0x1c91ce5dbe84dad56e5236bc97d90bfb5473cfadb9fb92de60fb5224932e337c",
+        "finality": "FINALIZED",
+        "consensus": "MAJORITY_AGREE",
+        "validator_votes": " 'AGREE', 'DISAGREE', 'AGREE', 'AGREE', 'DISAGREE' ",
+        "actual_classification": "NEW_DAMAGE",
+        "label_match": false,
+        "result": {
+          "ambiguity_reason": "NONE",
+          "case_id": "MOV-SYN-14",
+          "classification": "NEW_DAMAGE",
+          "defect_present_after": "PRESENT",
+          "defect_present_before": "ABSENT",
+          "defect_severity_changed": "INCREASED",
+          "expected_digest_match": true,
+          "image_quality_sufficient": true,
+          "metadata": {
+            "a": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "1c117be82d307f7432091c4146ed62efd8eef82d195b2efc2cad1eb9c1e0040c",
+              "size": 76130,
+              "status": 200
+            },
+            "b": {
+              "content_type": "image/png",
+              "mime": "image/png",
+              "sha256": "caf8b8f9cf9086b10fccb94ab7d84a963ab334c5524c0b313b2fbd27325b4265",
+              "size": 76827,
+              "status": 200
+            }
+          },
+          "model_classification": "NEW_DAMAGE",
+          "observations": [
+            "Wall surface is clean and uniform in Image A.",
+            "Dark scuff marks or smudges are visible on the wall surface in Image B."
+          ],
+          "repair_evidence_present": false,
+          "same_area_visible": "YES",
+          "stage": "VISION",
+          "visibility_sufficient": true
+        }
+      }
     }
   ],
-  "asset_commit": "194be2d6c141c76bb9f737ffaaa1fee768c126af"
+  "asset_commit": "194be2d6c141c76bb9f737ffaaa1fee768c126af",
+  "hosted_contract": {
+    "address": "0x05c5770b6C2690cD1Acd36142E3c17ac2ED673c0",
+    "deployment_transaction": "0x05f145fe566c0f8c4e075666fe37c59dfe34bd5356f285c6007589905de39176",
+    "deployment_finality": "FINALIZED",
+    "source_sha256": "C98B7056D0B64065F3AEA99D6121F8831DBDE4329C8F901CE60D85BE4BB420B2",
+    "runtime": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+    "chain_id": "61999",
+    "rpc": "https://studio.genlayer.com/api",
+    "signer": "my-studionet-wallet",
+    "signer_address": "0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b"
+  },
+  "hosted_results": "hosted_results.ndjson",
+  "tested_cases": 14,
+  "finalized_cases": 14,
+  "majority_agree_cases": 10,
+  "majority_disagree_cases": 4
 }
