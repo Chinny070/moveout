@@ -1,0 +1,1 @@
+{"case_id":"MOV-SYN-01","tx_id":"0xa97c5d917fe2da2840599386da6064f2534c5ccf1f55373f506c00f36b32e32f","finality":"FINALIZED","consensus":"MAJORITY_DISAGREE","votes":" 'AGREE', 'DISAGREE', 'IDLE', 'DISAGREE', 'DISAGREE' ","expected":"UNCHANGED","actual":null,"match":null,"result":null}

@@ -91,3 +91,9 @@ All 14 transaction receipts reached `FINALIZED`. Majority agreement was not unan
 **STAGE 0.6B HOSTED EXPERIMENT: COMPLETE.** The controlled visual pipeline was exercised on StudioNet with independently executed validator comparisons and real consensus outcomes.
 
 **CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK.** Only 5 of 10 majority-agreed results matched the frozen labels; 4 cases ended in consensus disagreement; ambiguity and shadow cases yielded inappropriate certainty. **REAL-WORLD PROPERTY ACCURACY: NOT VERIFIED. READY FOR STAGE 1: NO.** No canonical MoveOut contract, tenancy/deposit features, or frontend was implemented or deployed. Stop here.
+
+## Stage 0.7 follow-up — observation-first safety proof
+
+Stage 0.7 reused these 14 frozen pairs and expected labels with a separate disposable observation-first contract. Its 15-field observation schema, conservative custom equivalence, hosted receipts, and per-case results are documented in [MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md](MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md) and [`stage07_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage07_v2_results.ndjson).
+
+All 14 cases reached an accepted result and 13 recovered receipts confirm majority agreement and finality; case 4's accepted state was authoritatively reread, but its receipt was not recovered. Seven of 14 matched the frozen labels (50%, the same match rate as Stage 0.6B's 5/10 accepted results). Stage 0.7 avoided the Stage 0.6B false `NEW_DAMAGE` result for the shadow case and detected the image-text injection, but the ambiguous-mark case still produced a false `WORSENED` result. The contract therefore remains **WEAK** for condition classification, and Stage 1 remains **NOT READY**. A CLI stderr exception prevented recovery of case 4's transaction hash and votes; that evidence gap is recorded in the Stage 0.7 report.
