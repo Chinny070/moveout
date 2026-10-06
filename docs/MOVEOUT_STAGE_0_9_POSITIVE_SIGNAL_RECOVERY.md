@@ -117,3 +117,7 @@ The final **SAFETY** assessment is **FAILED / NOT VIABLE under the Stage 0.9 gat
 The v2 source and prompt contain no `MOV-SYN-*` case identifiers, fixture filenames, fixture hashes as class selectors, expected labels, or URL-specific classification branches. Expected SHA-256 values are only used to bind fetched evidence bytes to the frozen manifest. Expected labels are used by the external evaluation logger only and are not passed to the contract or model. The contract has no tenancy, deposit, repair-cost, liability, or canonical MoveOut behavior.
 
 The 14 cases are synthetic. Validator model outputs can vary; majority agreement did not prevent a correlated false `WORSENED`; receipt votes do not reveal every validator's raw prompt/image/model output; and the visual observation is not evidence of physical truth. **REAL-WORLD PROPERTY ACCURACY: NOT YET VERIFIED. READY FOR STAGE 1: NO.** Stage 0.9 ends as a failed safety gate. Do not begin Stage 1.
+
+## Architecture review disposition (2026-10-06)
+
+The Stage 0.9 **visual safety gate remains FAILED** as recorded above. A subsequent authority-model review authorizes readiness for Stage 1's deterministic protocol foundation only; it does not start Stage 1, approve production visual adjudication, or change any Stage 0.9 result. See [MoveOut Visual Verdict Architecture](MOVEOUT_VISUAL_VERDICT_ARCHITECTURE.md) for the revised scope and decision. **Real-world property visual accuracy remains NOT YET VERIFIED.**
