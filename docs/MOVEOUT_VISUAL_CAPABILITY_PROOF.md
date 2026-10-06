@@ -173,6 +173,27 @@ Consensus receipts still do not expose per-validator URL payloads, image bytes, 
 
 All hosted deployment and write transactions below used `studionet`, chain `61999`, RPC `https://studio.genlayer.com/api`, and the already-authorized `my-studionet-wallet` (`0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b`). Each accepted write was finalized and followed by a `get_result()` read, unless stated as undetermined. Test-only deployments: v4 tx `0xbc87c10adda56852d8b99c6b9a742dcc96186a4a96902d4b619eb1b1fa5e4524`, address `0x90e5559c34dAc280bf41F4Ec47056124dd6b6F20`; v5 tx `0xdfd26062d92127262a9db5d5cb9a526818fe5e9d5ff4b151ce351c6755d86ff8`, address `0xaCC87512DD361EEcf329E85762C67194ae436C9a`. Both deployment receipts were accepted with majority agreement.
 
+## Stage 0.9 property-image benchmark addendum
+
+The Stage 0.9 final disposable contract used the already-proven validator-side direct-image retrieval and `gl.nondet.exec_prompt(images=[...])` mechanism with independent custom equivalence, on the same pinned StudioNet runtime. Final v2 SHA-256: `0E63BA93464AFF2DF2BA51859E397083FFA3A48ABAE481917869E863694C81E4`; address `0x9a6B147c8f4F8cAB477911A13Fd79dA6225c9bE0`; deployment tx `0x7510e83a1ee2c8efd957324270d661c8e277cb134eab838fc869980a8b7964b6` (five AGREE). All 14 benchmark receipts finalized with majority agreement; all 14 authoritative state rereads matched the accepted transaction result. All 28 image responses had status 200, `image/png`, and exact manifest digest parity.
+
+Stage 0.9 recovered both clear `NEW_DAMAGE` cases, the clear `WORSENED` case, and two `UNCHANGED` cases. Its safety gate failed because ambiguous-mark case 12 again reached accepted `WORSENED` after the bounded observation claimed a same defect, length increase, and immaterial confounders; three active validator votes agreed, one disagreed, and one was idle. The resulting evidence indicates the limitation is in visual ambiguity recognition/correlated validator interpretation, not image retrieval or digest provenance. The failure, every v2 transaction, bounded observation, and stage comparison are recorded in [MOVEOUT_STAGE_0_9_POSITIVE_SIGNAL_RECOVERY.md](MOVEOUT_STAGE_0_9_POSITIVE_SIGNAL_RECOVERY.md) and [`stage09_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage09_v2_results.ndjson).
+
+| Measure | Stage 0.6B | Stage 0.7 | Stage 0.8 v2 | Stage 0.9 v2 |
+|---|---:|---:|---:|---:|
+| Label matches | 5 / 10 accepted | 7 / 14 returned | 7 / 14 attempts | 9 / 14 |
+| Unresolved | 4 | 0 (one receipt unavailable) | 2 | 0 |
+| False `NEW_DAMAGE` | 1 | 0 | 0 | 0 |
+| False `WORSENED` | 1 | 1 | 0 | 1 |
+| False `REPAIRED` | 0 accepted | 0 | 0 | 0 |
+| Clear `NEW_DAMAGE` preserved | 2 / 2 | 2 / 2 | 0 / 2 | 2 / 2 |
+| Clear `WORSENED` preserved | 1 / 1 (+1 false) | 0 / 1 (+1 false) | 1 / 1 | 1 / 1 (+1 false) |
+| Clear `PRE_EXISTING` preserved | 0 / 2 | 1 / 2 | 0 / 2 | 0 / 2 |
+| Clear `UNCHANGED` preserved | 1 / 3 | 0 / 3 | 2 / 3 | 2 / 3 |
+| Expected insufficient behavior | 1 / 5 explicit; 3 disagreements; 1 false class | 4 / 5 explicit | 4 / 5 explicit; 1 disagreement | 4 / 5 explicit; 1 false class |
+
+**Stage 0.9 safety gate: FAILED.** This is synthetic feasibility evidence only; real-world property accuracy remains **NOT YET VERIFIED**, and Stage 1 is **NO**.
+
 | Test | Transaction | Consensus/finality | Authoritative result / conclusion |
 |---|---|---|---|
 | v4 raw red PNG metadata | `0x06d22b23412370bd74cefede1ce457714e26a45e6186f1e97e79d41a901658b9` | Accepted, 3 AGREE / 2 IDLE | Exact PNG metadata, 2,941-byte size and digest above; proves status/header/body/hash operations. |

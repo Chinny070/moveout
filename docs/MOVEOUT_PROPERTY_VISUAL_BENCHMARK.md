@@ -92,6 +92,27 @@ All 14 transaction receipts reached `FINALIZED`. Majority agreement was not unan
 
 **CONTROLLED PROPERTY VISUAL FEASIBILITY: WEAK.** Only 5 of 10 majority-agreed results matched the frozen labels; 4 cases ended in consensus disagreement; ambiguity and shadow cases yielded inappropriate certainty. **REAL-WORLD PROPERTY ACCURACY: NOT VERIFIED. READY FOR STAGE 1: NO.** No canonical MoveOut contract, tenancy/deposit features, or frontend was implemented or deployed. Stop here.
 
+## Stage 0.9 positive-signal recovery
+
+Stage 0.9 reused these same 14 pairs, 28 images, URLs, SHA-256 values, and labels. Final v2 source SHA-256 `0E63BA93464AFF2DF2BA51859E397083FFA3A48ABAE481917869E863694C81E4` was deployed to disposable contract `0x9a6B147c8f4F8cAB477911A13Fd79dA6225c9bE0` (deployment tx `0x7510e83a1ee2c8efd957324270d661c8e277cb134eab838fc869980a8b7964b6`) on the same StudioNet and pinned runtime. All 14 transactions finalized with majority agreement and authoritative state rereads. All 28 response digests matched the frozen manifest.
+
+Positive recovery: both `NEW_DAMAGE` fixtures, the clear `WORSENED` fixture, and two `UNCHANGED` fixtures were preserved. The final run nevertheless failed the safety gate: ambiguous-mark case 12 was accepted as false `WORSENED`. Both `PRE_EXISTING` cases remained insufficient, and repair case 7 remained insufficient under the strict surface-restoration rule. The pilot initially produced a false `PRE_EXISTING` for lookalike case 11; the final v2 gate was tightened to require the same defect in both comparable photos, and case 11 then failed closed correctly.
+
+| Measure | Stage 0.6B | Stage 0.7 | Stage 0.8 v2 | Stage 0.9 v2 |
+|---|---:|---:|---:|---:|
+| Label matches | 5 / 10 accepted | 7 / 14 returned | 7 / 14 attempts | 9 / 14 |
+| Unresolved | 4 | 0 (one receipt unavailable) | 2 | 0 |
+| False `NEW_DAMAGE` | 1 | 0 | 0 | 0 |
+| False `WORSENED` | 1 | 1 | 0 | **1** |
+| False `REPAIRED` | 0 accepted | 0 | 0 | 0 |
+| Clear `NEW_DAMAGE` preserved | 2 / 2 | 2 / 2 | 0 / 2 | 2 / 2 |
+| Clear `WORSENED` preserved | 1 / 1 (+1 false) | 0 / 1 (+1 false) | 1 / 1 | 1 / 1 (+1 false) |
+| Clear `PRE_EXISTING` preserved | 0 / 2 | 1 / 2 | 0 / 2 | 0 / 2 |
+| Clear `UNCHANGED` preserved | 1 / 3 | 0 / 3 | 2 / 3 | 2 / 3 |
+| Expected insufficient behavior | 1 / 5 explicit; 3 disagreements; 1 false class | 4 / 5 explicit | 4 / 5 explicit; 1 disagreement | 4 / 5 explicit; 1 false class |
+
+Full audit, case observations, final receipts, and transactions: [Stage 0.9 positive-signal recovery](MOVEOUT_STAGE_0_9_POSITIVE_SIGNAL_RECOVERY.md), [`stage09_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage09_v2_results.ndjson), and [`stage09_v1_results.ndjson`](../benchmarks/controlled-property-2026-10/stage09_v1_results.ndjson) (partial diagnostic pilot). **Stage 0.9 safety gate: FAILED. Controlled visual safety: NOT VIABLE under the requested gate. Real-world accuracy: NOT YET VERIFIED. Stage 1: NO.**
+
 ## Stage 0.7 follow-up — observation-first safety proof
 
 Stage 0.7 reused these 14 frozen pairs and expected labels with a separate disposable observation-first contract. Its 15-field observation schema, conservative custom equivalence, hosted receipts, and per-case results are documented in [MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md](MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md) and [`stage07_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage07_v2_results.ndjson).
