@@ -365,6 +365,10 @@ def test_condition_create_retry_after_inspection_freeze_returns_original_id(worl
     _, area_id = make_room_area(world)
     args = (inspection_id, area_id, "OTHER", "", "", "condition-before-freeze")
     condition_id = c.create_condition_record(*args)
+    evidence_id = make_evidence(
+        world, inspection_id, area_id, request="condition-retry-freeze-evidence"
+    )
+    c.freeze_evidence(evidence_id)
     c.freeze_inspection(inspection_id)
     assert c.create_condition_record(*args) == condition_id
 

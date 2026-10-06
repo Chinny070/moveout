@@ -153,6 +153,10 @@ The Property Condition Passport can later reconstruct each inspection and eviden
 
 **REAL-WORLD PROPERTY VISUAL ACCURACY: NOT YET VERIFIED.** No production visual adjudication, frontend, backend, external evidence service, StudioNet transaction, or canonical deployment is part of Stage 1.
 
+## Stage 2 protocol extension
+
+Stage 2 extends this deterministic foundation with Capture Slots, structural Inspection completeness, dual-party review, append-only disagreements and counter-evidence, Visual Continuity references, a paginated Inspection Receipt, and linked maintenance/repair history. It retains the no-finding-writer boundary and does not fetch or classify images. See [Stage 2 Inspection and Evidence Protocol](MOVEOUT_STAGE_2_INSPECTION_EVIDENCE.md) for the extension schema, semantics, authority, and bounds.
+
 ## Official GenLayer references consulted
 
 - [Official GenLayer `write-contract` skill](https://github.com/genlayerlabs/skills/blob/main/plugins/genlayer-dev/skills/write-contract/SKILL.md)

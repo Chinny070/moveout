@@ -16,6 +16,10 @@ class MoveOutProtocolV1(gl.Contract):
     area_items: TreeMap[str, str]
     condition_records: TreeMap[str, str]
     evidence_records: TreeMap[str, str]
+    capture_slots: TreeMap[str, str]
+    inspection_reviews: TreeMap[str, str]
+    disagreements: TreeMap[str, str]
+    maintenance_events: TreeMap[str, str]
 
     # Future adjudication record stores intentionally have no public writer in Stage 1.
     visual_observations: TreeMap[str, str]
@@ -27,6 +31,8 @@ class MoveOutProtocolV1(gl.Contract):
     current_tenancy_by_unit: TreeMap[str, str]
     open_tenancy_by_unit_tenant: TreeMap[str, str]
     superseded_by: TreeMap[str, str]
+    review_current_by_actor: TreeMap[str, str]
+    counter_evidence_by_disagreement: TreeMap[str, str]
 
     properties_by_creator: TreeMap[str, str]
     active_manager_count: TreeMap[str, u256]
@@ -37,7 +43,16 @@ class MoveOutProtocolV1(gl.Contract):
     rooms_by_unit: TreeMap[str, str]
     areas_by_room: TreeMap[str, str]
     conditions_by_inspection: TreeMap[str, str]
+    conditions_by_prior_condition: TreeMap[str, str]
     evidence_by_inspection: TreeMap[str, str]
+    capture_slots_by_inspection: TreeMap[str, str]
+    evidence_by_capture_slot: TreeMap[str, str]
+    rooms_by_inspection: TreeMap[str, str]
+    areas_by_inspection: TreeMap[str, str]
+    reviews_by_inspection: TreeMap[str, str]
+    disagreements_by_inspection: TreeMap[str, str]
+    maintenance_by_tenancy: TreeMap[str, str]
+    maintenance_by_inspection: TreeMap[str, str]
     observations_by_inspection: TreeMap[str, str]
     findings_by_inspection: TreeMap[str, str]
     events_by_property: TreeMap[str, str]
@@ -50,6 +65,10 @@ class MoveOutProtocolV1(gl.Contract):
     area_seq: u256
     condition_seq: u256
     evidence_seq: u256
+    capture_slot_seq: u256
+    review_seq: u256
+    disagreement_seq: u256
+    maintenance_seq: u256
     event_seq: u256
 
     MAX_TEXT = 240
@@ -63,6 +82,14 @@ class MoveOutProtocolV1(gl.Contract):
     MAX_AREAS_PER_ROOM = 64
     MAX_CONDITIONS_PER_INSPECTION = 64
     MAX_EVIDENCE_PER_INSPECTION = 64
+    MAX_ROOMS_PER_INSPECTION = 64
+    MAX_AREAS_PER_INSPECTION = 256
+    MAX_CAPTURE_SLOTS_PER_INSPECTION = 64
+    MAX_REVIEWS_PER_INSPECTION = 64
+    MAX_REVIEW_REVISIONS_PER_ACTOR = 8
+    MAX_DISAGREEMENTS_PER_INSPECTION = 64
+    MAX_COUNTER_EVIDENCE_PER_DISAGREEMENT = 64
+    MAX_MAINTENANCE_PER_TENANCY = 64
     MAX_MANAGERS_PER_PROPERTY = 8
     MAX_MANAGER_HISTORY_PER_PROPERTY = 128
     MAX_HISTORY_PER_PROPERTY = 1024
@@ -74,7 +101,18 @@ class MoveOutProtocolV1(gl.Contract):
         "OBSERVED_DAMAGE", "PRE_EXISTING_CLAIM", "MAINTENANCE_NOTE",
         "REPAIR_CLAIM", "NO_VISIBLE_ISSUE", "OTHER",
     )
-    EVIDENCE_TYPES = ("PHOTO", "VIDEO_REFERENCE", "DOCUMENT_REFERENCE", "RECEIPT", "OTHER")
+    EVIDENCE_TYPES = (
+        "PHOTO", "VIDEO_REFERENCE", "DOCUMENT_REFERENCE", "RECEIPT", "OTHER",
+        "DOCUMENT", "REPAIR_RECEIPT", "MAINTENANCE_RECORD", "INSPECTION_NOTE",
+    )
+    CAPTURE_SLOT_TYPES = (
+        "OVERVIEW", "DETAIL", "FRONT", "BACK", "CLOSE_UP", "CONTEXT", "DOCUMENT",
+    )
+    CAPTURE_OBSTRUCTION_VALUES = ("NONE", "PARTIAL", "UNKNOWN")
+    CAPTURE_LIGHT_VALUES = ("NORMAL", "LOW", "UNKNOWN")
+    REVIEW_STATES = ("ACKNOWLEDGED", "DISPUTED")
+    DISAGREEMENT_TARGET_TYPES = ("INSPECTION", "CONDITION_RECORD", "EVIDENCE")
+    MAINTENANCE_EVENT_TYPES = ("MAINTENANCE_REPORTED", "REPAIR_REPORTED", "SERVICE_REPORTED")
     TENANCY_STATES = ("DRAFT", "ACTIVE", "MOVE_OUT_PENDING", "ENDED", "CANCELLED")
     INSPECTION_STATES = ("OPEN", "FROZEN", "CANCELLED")
     FUTURE_OBSERVATION_TYPES = (
@@ -105,6 +143,10 @@ class MoveOutProtocolV1(gl.Contract):
         self.area_seq = u256(1)
         self.condition_seq = u256(1)
         self.evidence_seq = u256(1)
+        self.capture_slot_seq = u256(1)
+        self.review_seq = u256(1)
+        self.disagreement_seq = u256(1)
+        self.maintenance_seq = u256(1)
         self.event_seq = u256(1)
 
     def _now(self) -> str:
@@ -250,15 +292,248 @@ class MoveOutProtocolV1(gl.Contract):
                                    evidence_id: str = "") -> None:
         room_ids = inspection["room_ids"]
         if room_id not in room_ids:
+            if len(room_ids) >= int(self.MAX_ROOMS_PER_INSPECTION):
+                self._fail("MO_ERR_BOUNDS", "rooms_per_inspection")
             room_ids.append(room_id)
         area_ids = inspection["area_item_ids"]
         if area_item_id not in area_ids:
+            if len(area_ids) >= int(self.MAX_AREAS_PER_INSPECTION):
+                self._fail("MO_ERR_BOUNDS", "areas_per_inspection")
             area_ids.append(area_item_id)
         if condition_id:
             inspection["condition_record_ids"].append(condition_id)
         if evidence_id:
             inspection["evidence_ids"].append(evidence_id)
         self.inspections[inspection["inspection_id"]] = self._json(inspection)
+        self.rooms_by_inspection[inspection["inspection_id"]] = self._json(room_ids)
+        self.areas_by_inspection[inspection["inspection_id"]] = self._json(area_ids)
+
+    def _require_same_participant_side(self, tenancy: dict, actor: str) -> str:
+        if actor == tenancy["tenant"]:
+            return "TENANT"
+        if self._is_manager(tenancy["property_id"], actor):
+            return "MANAGER"
+        self._fail("MO_ERR_UNAUTHORIZED", "tenancy_participant_required")
+
+    def _inspection_number(self, inspection_id: str) -> int:
+        prefix = "INSP-"
+        if not inspection_id.startswith(prefix):
+            self._fail("MO_ERR_SCHEMA", "inspection_id")
+        suffix = inspection_id[len(prefix):]
+        if not suffix.isdigit():
+            self._fail("MO_ERR_SCHEMA", "inspection_id")
+        return int(suffix)
+
+    def _validate_continuity(self, inspection: dict, area: dict,
+                             previous_slot_id: str, previous_evidence_id: str) -> dict:
+        if not previous_slot_id and not previous_evidence_id:
+            return {}
+        prior_slot = {}
+        if previous_slot_id:
+            prior_slot = self._load(self.capture_slots, previous_slot_id, "capture_slot")
+        if previous_evidence_id:
+            prior_evidence = self._load(self.evidence_records, previous_evidence_id, "evidence")
+            if prior_evidence["status"] != "FROZEN":
+                self._fail("MO_ERR_STATE", "continuity_evidence_not_frozen")
+            evidence_slot_id = prior_evidence.get("capture_slot_id", "")
+            if not evidence_slot_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "continuity_evidence_has_no_capture_slot")
+            if previous_slot_id and evidence_slot_id != previous_slot_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "continuity_slot_evidence_mismatch")
+            prior_slot = self._load(self.capture_slots, evidence_slot_id, "capture_slot")
+        if not prior_slot:
+            self._fail("MO_ERR_SCHEMA", "continuity_reference_required")
+        old_inspection = self._load(self.inspections, prior_slot["inspection_id"], "inspection")
+        old_area = self._load(self.area_items, prior_slot["area_item_id"], "area_item")
+        if old_inspection["status"] != "FROZEN":
+            self._fail("MO_ERR_STATE", "continuity_inspection_not_frozen")
+        if (self._inspection_number(old_inspection["inspection_id"]) >=
+                self._inspection_number(inspection["inspection_id"])):
+            self._fail("MO_ERR_WRONG_SCOPE", "continuity_must_point_backward")
+        if (old_inspection["property_id"] != inspection["property_id"] or
+                old_inspection["unit_id"] != inspection["unit_id"] or
+                old_inspection["tenancy_id"] != inspection["tenancy_id"] or
+                old_area["property_id"] != area["property_id"] or
+                old_area["unit_id"] != area["unit_id"] or
+                old_area["room_id"] != area["room_id"] or
+                old_area["area_item_id"] != area["area_item_id"]):
+            self._fail("MO_ERR_WRONG_SCOPE", "continuity_parent_binding")
+        if not previous_evidence_id:
+            prior_evidence_ids = json.loads(
+                self.evidence_by_capture_slot.get(prior_slot["capture_slot_id"], "[]")
+            )
+            if not any(json.loads(self.evidence_records[eid])["status"] == "FROZEN"
+                       for eid in prior_evidence_ids):
+                self._fail("MO_ERR_STATE", "continuity_slot_has_no_frozen_evidence")
+        return {"capture_slot_id": prior_slot["capture_slot_id"],
+                "evidence_id": previous_evidence_id}
+
+    def _validate_prior_condition(self, inspection: dict, area: dict,
+                                  prior_condition_id: str) -> str:
+        if not prior_condition_id:
+            return ""
+        prior = self._load(self.condition_records, prior_condition_id, "condition_record")
+        prior_inspection = self._load(
+            self.inspections, prior["inspection_id"], "inspection"
+        )
+        if prior_inspection["status"] != "FROZEN":
+            self._fail("MO_ERR_STATE", "prior_condition_inspection_not_frozen")
+        if self._inspection_number(prior["inspection_id"]) >= self._inspection_number(
+                inspection["inspection_id"]):
+            self._fail("MO_ERR_WRONG_SCOPE", "prior_condition_must_point_backward")
+        if (prior["property_id"] != inspection["property_id"] or
+                prior["unit_id"] != inspection["unit_id"] or
+                prior["tenancy_id"] != inspection["tenancy_id"] or
+                prior["area_item_id"] != area["area_item_id"]):
+            self._fail("MO_ERR_WRONG_SCOPE", "prior_condition_parent_binding")
+        return prior_condition_id
+
+    def _inspection_completeness(self, inspection: dict) -> dict:
+        inspection_id = inspection["inspection_id"]
+        rooms = inspection["room_ids"]
+        areas = inspection["area_item_ids"]
+        conditions = inspection["condition_record_ids"]
+        evidence_ids = inspection["evidence_ids"]
+        slot_ids = inspection.get("capture_slot_ids", [])
+        maintenance_ids = inspection.get("maintenance_event_ids", [])
+        every_room_has_area = bool(rooms) and all(
+            any(json.loads(self.area_items[area_id])["room_id"] == room_id
+                for area_id in areas)
+            for room_id in rooms
+        )
+        slots_have_evidence = True
+        parents_valid = True
+        for room_id in rooms:
+            room = self._load(self.rooms, room_id, "room")
+            if room["unit_id"] != inspection["unit_id"] or room["property_id"] != inspection["property_id"]:
+                parents_valid = False
+        for area_id in areas:
+            area = self._load(self.area_items, area_id, "area_item")
+            room = self._load(self.rooms, area["room_id"], "room")
+            if (area["property_id"] != inspection["property_id"] or
+                    area["unit_id"] != inspection["unit_id"] or
+                    room["room_id"] not in rooms or room["unit_id"] != inspection["unit_id"]):
+                parents_valid = False
+        for condition_id in conditions:
+            condition = self._load(self.condition_records, condition_id, "condition_record")
+            if (condition["inspection_id"] != inspection_id or
+                    condition["tenancy_id"] != inspection["tenancy_id"] or
+                    condition["area_item_id"] not in areas):
+                parents_valid = False
+            prior_condition_id = condition.get("participant_asserted_prior_condition_id", "")
+            if prior_condition_id:
+                prior = self._load(
+                    self.condition_records, prior_condition_id, "condition_record"
+                )
+                prior_inspection = self._load(
+                    self.inspections, prior["inspection_id"], "inspection"
+                )
+                if (prior_inspection["status"] != "FROZEN" or
+                        prior["property_id"] != inspection["property_id"] or
+                        prior["unit_id"] != inspection["unit_id"] or
+                        prior["tenancy_id"] != inspection["tenancy_id"] or
+                        prior["area_item_id"] != condition["area_item_id"] or
+                        self._inspection_number(prior["inspection_id"]) >=
+                        self._inspection_number(inspection_id)):
+                    parents_valid = False
+                if condition_id not in json.loads(
+                        self.conditions_by_prior_condition.get(prior_condition_id, "[]")):
+                    parents_valid = False
+        all_evidence_frozen = True
+        for evidence_id in evidence_ids:
+            evidence = self._load(self.evidence_records, evidence_id, "evidence")
+            if (evidence["inspection_id"] != inspection_id or
+                    evidence["tenancy_id"] != inspection["tenancy_id"] or
+                    evidence["area_item_id"] not in areas):
+                parents_valid = False
+            if evidence["status"] != "FROZEN":
+                all_evidence_frozen = False
+            slot_id = evidence.get("capture_slot_id", "")
+            if slot_id:
+                slot = self._load(self.capture_slots, slot_id, "capture_slot")
+                slot_evidence_ids = json.loads(
+                    self.evidence_by_capture_slot.get(slot_id, "[]")
+                )
+                if (slot["inspection_id"] != inspection_id or
+                        slot["area_item_id"] != evidence["area_item_id"] or
+                        evidence_id not in slot_evidence_ids or slot_id not in slot_ids):
+                    parents_valid = False
+        for slot_id in slot_ids:
+            slot = self._load(self.capture_slots, slot_id, "capture_slot")
+            if (slot["inspection_id"] != inspection_id or
+                    slot["tenancy_id"] != inspection["tenancy_id"] or
+                    slot["area_item_id"] not in areas):
+                parents_valid = False
+            if not json.loads(self.evidence_by_capture_slot.get(slot_id, "[]")):
+                slots_have_evidence = False
+            if slot.get("continuity_slot_id") or slot.get("continuity_evidence_id"):
+                self._validate_continuity(
+                    inspection,
+                    self._load(self.area_items, slot["area_item_id"], "area_item"),
+                    slot.get("continuity_slot_id", ""),
+                    slot.get("continuity_evidence_id", ""),
+                )
+        for event_id in maintenance_ids:
+            event = self._load(self.maintenance_events, event_id, "maintenance_event")
+            if (event["inspection_id"] != inspection_id or
+                    event["tenancy_id"] != inspection["tenancy_id"] or
+                    event["area_item_id"] not in areas):
+                parents_valid = False
+            if event["condition_record_id"]:
+                condition = self._load(
+                    self.condition_records, event["condition_record_id"], "condition_record"
+                )
+                if (condition["property_id"] != inspection["property_id"] or
+                        condition["unit_id"] != inspection["unit_id"] or
+                        condition["tenancy_id"] != inspection["tenancy_id"] or
+                        condition["area_item_id"] != event["area_item_id"]):
+                    parents_valid = False
+            if event["evidence_id"]:
+                evidence = self._load(self.evidence_records, event["evidence_id"], "evidence")
+                if (evidence["property_id"] != inspection["property_id"] or
+                        evidence["unit_id"] != inspection["unit_id"] or
+                        evidence["tenancy_id"] != inspection["tenancy_id"] or
+                        evidence["area_item_id"] != event["area_item_id"] or
+                        evidence["status"] != "FROZEN"):
+                    parents_valid = False
+        indexes_match = (
+            json.loads(self.rooms_by_inspection.get(inspection_id, "[]")) == rooms and
+            json.loads(self.areas_by_inspection.get(inspection_id, "[]")) == areas and
+            json.loads(self.conditions_by_inspection.get(inspection_id, "[]")) == conditions and
+            json.loads(self.evidence_by_inspection.get(inspection_id, "[]")) == evidence_ids and
+            json.loads(self.capture_slots_by_inspection.get(inspection_id, "[]")) == slot_ids and
+            json.loads(self.maintenance_by_inspection.get(inspection_id, "[]")) == maintenance_ids
+        )
+        snapshot = inspection.get("contents_committed", {})
+        snapshot_matches = (
+            inspection["status"] != "FROZEN" or snapshot == {
+                "room_ids": rooms, "area_item_ids": areas,
+                "condition_record_ids": conditions, "evidence_ids": evidence_ids,
+                "capture_slot_ids": slot_ids, "maintenance_event_ids": maintenance_ids,
+            }
+        )
+        checks = {
+            "has_room": bool(rooms),
+            "every_room_has_area_item": every_room_has_area,
+            "has_evidence": bool(evidence_ids),
+            "every_capture_slot_has_evidence": slots_have_evidence,
+            "parent_bindings_valid": parents_valid,
+            "manifest_indexes_consistent": indexes_match,
+            "all_evidence_frozen": all_evidence_frozen,
+            "frozen_snapshot_consistent": snapshot_matches,
+        }
+        missing = [name for name, passed in checks.items() if not passed]
+        structurally_complete = all(checks.values())
+        return {
+            "inspection_id": inspection_id,
+            "status": inspection["status"],
+            "structurally_complete": structurally_complete,
+            "frozen": inspection["status"] == "FROZEN",
+            "complete": structurally_complete and inspection["status"] == "FROZEN",
+            "ready_to_freeze": structurally_complete and inspection["status"] == "OPEN",
+            "checks": checks,
+            "missing_requirements": missing,
+        }
 
     @gl.public.write
     def create_property(self, property_label: str, request_id: str) -> str:
@@ -507,7 +782,8 @@ class MoveOutProtocolV1(gl.Contract):
             "inspection_type": kind, "created_by": self._sender(),
             "created_at": self._now(), "frozen_at": "", "status": "OPEN",
             "room_ids": [], "area_item_ids": [], "condition_record_ids": [],
-            "evidence_ids": [],
+            "evidence_ids": [], "capture_slot_ids": [], "maintenance_event_ids": [],
+            "contents_committed": {},
         })
         self._append(self.inspections_by_tenancy, tenancy_id, inspection_id,
                      u256(self.MAX_INSPECTIONS_PER_TENANCY), "inspections_per_tenancy")
@@ -590,20 +866,110 @@ class MoveOutProtocolV1(gl.Contract):
         return area_id
 
     @gl.public.write
+    def include_area_in_inspection(self, inspection_id: str, area_item_id: str,
+                                   request_id: str) -> None:
+        payload = {"inspection_id": inspection_id, "area_item_id": area_item_id}
+        replay = self._idempotent_replay("include_area_in_inspection", request_id, payload)
+        if replay:
+            return
+        inspection, tenancy, area, room = self._record_parent_context(
+            inspection_id, area_item_id
+        )
+        self._add_inspection_membership(inspection, room["room_id"], area["area_item_id"])
+        self._append_event(tenancy["property_id"], "AREA_INCLUDED_IN_INSPECTION",
+                           "area_item", area["area_item_id"])
+        self._remember("include_area_in_inspection", request_id, payload, inspection_id)
+
+    @gl.public.write
+    def create_capture_slot(self, inspection_id: str, area_item_id: str,
+                            slot_type: str, label: str, instructions: str,
+                            continuity_slot_id: str, continuity_evidence_id: str,
+                            request_id: str) -> str:
+        slot_kind = self._enum(slot_type, self.CAPTURE_SLOT_TYPES, "capture_slot_type")
+        slot_label = self._text(label, u256(self.MAX_LABEL), "capture_slot_label")
+        slot_instructions = self._text(
+            instructions, u256(self.MAX_TEXT), "capture_slot_instructions", allow_empty=True
+        )
+        prior_slot_id = self._text(continuity_slot_id, u256(64),
+                                   "continuity_slot_id", allow_empty=True)
+        prior_evidence_id = self._text(continuity_evidence_id, u256(64),
+                                       "continuity_evidence_id", allow_empty=True)
+        payload = {"inspection_id": inspection_id, "area_item_id": area_item_id,
+                   "slot_type": slot_kind, "label": slot_label,
+                   "instructions": slot_instructions,
+                   "continuity_slot_id": prior_slot_id,
+                   "continuity_evidence_id": prior_evidence_id}
+        replay = self._idempotent_replay("create_capture_slot", request_id, payload)
+        if replay:
+            return replay
+        inspection, tenancy, area, room = self._record_parent_context(
+            inspection_id, area_item_id
+        )
+        continuity = self._validate_continuity(
+            inspection, area, prior_slot_id, prior_evidence_id
+        )
+        self._add_inspection_membership(inspection, room["room_id"], area["area_item_id"])
+        slot_id = self._new_id("SLOT", self.capture_slot_seq)
+        self.capture_slot_seq += u256(1)
+        self.capture_slots[slot_id] = self._json({
+            "capture_slot_id": slot_id, "property_id": inspection["property_id"],
+            "unit_id": inspection["unit_id"], "tenancy_id": tenancy["tenancy_id"],
+            "inspection_id": inspection_id, "room_id": room["room_id"],
+            "area_item_id": area_item_id, "slot_type": slot_kind,
+            "label": slot_label, "instructions": slot_instructions,
+            "creator": self._sender(), "created_at": self._now(),
+            "continuity_slot_id": continuity.get("capture_slot_id", ""),
+            "continuity_evidence_id": continuity.get("evidence_id", ""),
+        })
+        self._append(self.capture_slots_by_inspection, inspection_id, slot_id,
+                     u256(self.MAX_CAPTURE_SLOTS_PER_INSPECTION),
+                     "capture_slots_per_inspection")
+        inspection["capture_slot_ids"].append(slot_id)
+        self.inspections[inspection_id] = self._json(inspection)
+        self._append_event(tenancy["property_id"], "CAPTURE_SLOT_CREATED",
+                           "capture_slot", slot_id)
+        self._remember("create_capture_slot", request_id, payload, slot_id)
+        return slot_id
+
+    @gl.public.write
     def create_condition_record(self, inspection_id: str, area_item_id: str,
                                 condition_type: str, description: str,
                                 claim_ref: str, request_id: str) -> str:
+        return self._create_condition_record_internal(
+            inspection_id, area_item_id, "", condition_type, description,
+            claim_ref, "create_condition_record", request_id,
+        )
+
+    @gl.public.write
+    def create_condition_record_with_prior(self, inspection_id: str, area_item_id: str,
+                                           prior_condition_record_id: str,
+                                           condition_type: str, description: str,
+                                           claim_ref: str, request_id: str) -> str:
+        prior_id = self._text(prior_condition_record_id, u256(64),
+                              "prior_condition_record_id")
+        return self._create_condition_record_internal(
+            inspection_id, area_item_id, prior_id, condition_type, description,
+            claim_ref, "create_condition_record_with_prior", request_id,
+        )
+
+    def _create_condition_record_internal(self, inspection_id: str, area_item_id: str,
+                                          prior_condition_id: str, condition_type: str,
+                                          description: str, claim_ref: str,
+                                          idempotency_method: str,
+                                          request_id: str) -> str:
         self._text(inspection_id, u256(64), "inspection_id")
         self._text(area_item_id, u256(64), "area_item_id")
         kind = self._enum(condition_type, self.CONDITION_TYPES, "condition_type")
         detail = self._text(description, u256(self.MAX_TEXT), "description", allow_empty=True)
         claim = self._text(claim_ref, u256(self.MAX_SOURCE_REF), "claim_ref", allow_empty=True)
         payload = {"inspection_id": inspection_id, "area_item_id": area_item_id,
+                   "prior_condition_record_id": prior_condition_id,
                    "condition_type": kind, "description": detail, "claim_ref": claim}
-        replay = self._idempotent_replay("create_condition_record", request_id, payload)
+        replay = self._idempotent_replay(idempotency_method, request_id, payload)
         if replay:
             return replay
         inspection, tenancy, area, room = self._record_parent_context(inspection_id, area_item_id)
+        prior_id = self._validate_prior_condition(inspection, area, prior_condition_id)
         condition_ids = json.loads(self.conditions_by_inspection.get(inspection_id, "[]"))
         if len(condition_ids) >= int(self.MAX_CONDITIONS_PER_INSPECTION):
             self._fail("MO_ERR_BOUNDS", "conditions_per_inspection")
@@ -616,15 +982,18 @@ class MoveOutProtocolV1(gl.Contract):
             "room_id": room["room_id"], "area_item_id": area["area_item_id"],
             "submitter": self._sender(), "condition_type": kind,
             "description": detail, "claim_ref": claim,
+            "participant_asserted_prior_condition_id": prior_id,
             "created_at": self._now(), "status": "PARTICIPANT_RECORDED",
         })
         self._append(self.conditions_by_inspection, inspection_id, condition_id,
                      u256(self.MAX_CONDITIONS_PER_INSPECTION), "conditions_per_inspection")
+        if prior_id:
+            self._append_unique(self.conditions_by_prior_condition, prior_id, condition_id)
         self._add_inspection_membership(inspection, room["room_id"], area["area_item_id"],
                                         condition_id=condition_id)
         self._append_event(tenancy["property_id"], "CONDITION_RECORD_CREATED",
                            "condition_record", condition_id)
-        self._remember("create_condition_record", request_id, payload, condition_id)
+        self._remember(idempotency_method, request_id, payload, condition_id)
         return condition_id
 
     @gl.public.write
@@ -632,6 +1001,47 @@ class MoveOutProtocolV1(gl.Contract):
                         condition_record_id: str, evidence_type: str,
                         source_ref: str, expected_sha256: str,
                         supersedes_evidence_id: str, request_id: str) -> str:
+        return self._submit_evidence_internal(
+            inspection_id, area_item_id, condition_record_id, evidence_type,
+            source_ref, expected_sha256, supersedes_evidence_id, "", "UNKNOWN",
+            "UNKNOWN", "", "", "submit_evidence", request_id,
+        )
+
+    @gl.public.write
+    def submit_evidence_for_slot(self, inspection_id: str, area_item_id: str,
+                                 capture_slot_id: str, condition_record_id: str,
+                                 evidence_type: str, source_ref: str,
+                                 expected_sha256: str, supersedes_evidence_id: str,
+                                 participant_obstruction: str, participant_light: str,
+                                 participant_note_ref: str, request_id: str) -> str:
+        return self._submit_evidence_internal(
+            inspection_id, area_item_id, condition_record_id, evidence_type,
+            source_ref, expected_sha256, supersedes_evidence_id, capture_slot_id,
+            participant_obstruction, participant_light, participant_note_ref,
+            "", "submit_evidence_for_slot", request_id,
+        )
+
+    @gl.public.write
+    def submit_counter_evidence(self, disagreement_id: str, inspection_id: str,
+                                area_item_id: str, capture_slot_id: str,
+                                condition_record_id: str, evidence_type: str,
+                                source_ref: str, expected_sha256: str,
+                                participant_obstruction: str, participant_light: str,
+                                participant_note_ref: str, request_id: str) -> str:
+        return self._submit_evidence_internal(
+            inspection_id, area_item_id, condition_record_id, evidence_type,
+            source_ref, expected_sha256, "", capture_slot_id,
+            participant_obstruction, participant_light, participant_note_ref,
+            disagreement_id, "submit_counter_evidence", request_id,
+        )
+
+    def _submit_evidence_internal(self, inspection_id: str, area_item_id: str,
+                                  condition_record_id: str, evidence_type: str,
+                                  source_ref: str, expected_sha256: str,
+                                  supersedes_evidence_id: str, capture_slot_id: str,
+                                  participant_obstruction: str, participant_light: str,
+                                  participant_note_ref: str, disagreement_id: str,
+                                  idempotency_method: str, request_id: str) -> str:
         self._text(inspection_id, u256(64), "inspection_id")
         self._text(area_item_id, u256(64), "area_item_id")
         kind = self._enum(evidence_type, self.EVIDENCE_TYPES, "evidence_type")
@@ -644,14 +1054,56 @@ class MoveOutProtocolV1(gl.Contract):
                                   "condition_record_id", allow_empty=True)
         supersedes_id = self._text(supersedes_evidence_id, u256(64),
                                    "supersedes_evidence_id", allow_empty=True)
+        slot_id = self._text(capture_slot_id, u256(64),
+                             "capture_slot_id", allow_empty=True)
+        obstruction = self._enum(participant_obstruction,
+                                 self.CAPTURE_OBSTRUCTION_VALUES, "participant_obstruction")
+        light = self._enum(participant_light,
+                           self.CAPTURE_LIGHT_VALUES, "participant_light")
+        participant_note = self._text(
+            participant_note_ref, u256(self.MAX_TEXT),
+            "participant_note_ref", allow_empty=True
+        )
+        dispute_id = self._text(disagreement_id, u256(64),
+                                "disagreement_id", allow_empty=True)
         payload = {"inspection_id": inspection_id, "area_item_id": area_item_id,
                    "condition_record_id": condition_id, "evidence_type": kind,
                    "source_ref": source, "expected_sha256": digest,
-                   "supersedes_evidence_id": supersedes_id}
-        replay = self._idempotent_replay("submit_evidence", request_id, payload)
+                   "supersedes_evidence_id": supersedes_id,
+                   "capture_slot_id": slot_id,
+                   "participant_obstruction": obstruction,
+                   "participant_light": light,
+                   "participant_note_ref": participant_note,
+                   "disagreement_id": dispute_id}
+        replay = self._idempotent_replay(idempotency_method, request_id, payload)
         if replay:
             return replay
         inspection, tenancy, area, room = self._record_parent_context(inspection_id, area_item_id)
+        if slot_id:
+            slot = self._load(self.capture_slots, slot_id, "capture_slot")
+            if (slot["inspection_id"] != inspection_id or
+                    slot["area_item_id"] != area_item_id or
+                    slot["room_id"] != room["room_id"] or
+                    slot["tenancy_id"] != tenancy["tenancy_id"]):
+                self._fail("MO_ERR_WRONG_SCOPE", "evidence_capture_slot_binding")
+        if dispute_id:
+            disagreement = self._load(self.disagreements, dispute_id, "disagreement")
+            prior_inspection = self._load(
+                self.inspections, disagreement["inspection_id"], "inspection"
+            )
+            if (prior_inspection["status"] != "FROZEN" or
+                    prior_inspection["tenancy_id"] != tenancy["tenancy_id"] or
+                    self._inspection_number(prior_inspection["inspection_id"]) >=
+                    self._inspection_number(inspection_id)):
+                self._fail("MO_ERR_WRONG_SCOPE", "counter_evidence_later_same_tenancy")
+            target_area_id = disagreement.get("area_item_id", "")
+            if target_area_id and target_area_id != area_item_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "counter_evidence_target_area")
+            existing_counter_evidence = json.loads(
+                self.counter_evidence_by_disagreement.get(dispute_id, "[]")
+            )
+            if len(existing_counter_evidence) >= int(self.MAX_COUNTER_EVIDENCE_PER_DISAGREEMENT):
+                self._fail("MO_ERR_BOUNDS", "counter_evidence_per_disagreement")
         if condition_id:
             condition = self._load(self.condition_records, condition_id, "condition_record")
             if (condition["inspection_id"] != inspection_id or
@@ -694,13 +1146,24 @@ class MoveOutProtocolV1(gl.Contract):
             "expected_sha256": digest, "submitted_at": self._now(),
             "frozen_at": "", "status": "SUBMITTED",
             "supersedes_evidence_id": supersedes_id,
+            "capture_slot_id": slot_id,
+            "participant_capture_metadata": {
+                "obstruction": obstruction, "light": light,
+                "note_ref": participant_note,
+            },
+            "disagreement_id": dispute_id,
         })
         self._append(self.evidence_by_inspection, inspection_id, evidence_id,
                      u256(self.MAX_EVIDENCE_PER_INSPECTION), "evidence_per_inspection")
+        if slot_id:
+            self._append_unique(self.evidence_by_capture_slot, slot_id, evidence_id)
+        if dispute_id:
+            self._append_unique(self.counter_evidence_by_disagreement,
+                                dispute_id, evidence_id)
         self._add_inspection_membership(inspection, room["room_id"], area["area_item_id"],
                                         evidence_id=evidence_id)
         self._append_event(tenancy["property_id"], "EVIDENCE_SUBMITTED", "evidence", evidence_id)
-        self._remember("submit_evidence", request_id, payload, evidence_id)
+        self._remember(idempotency_method, request_id, payload, evidence_id)
         return evidence_id
 
     @gl.public.write
@@ -749,6 +1212,9 @@ class MoveOutProtocolV1(gl.Contract):
             evidence = self._load(self.evidence_records, evidence_id, "evidence")
             if evidence["status"] != "FROZEN":
                 self._fail("MO_ERR_STATE", "all_evidence_must_be_frozen")
+        completeness = self._inspection_completeness(inspection)
+        if not completeness["structurally_complete"]:
+            self._fail("MO_ERR_STATE", "inspection_manifest_incomplete")
         # Frozen membership is an exact bounded snapshot; child records cannot join later.
         inspection["status"] = "FROZEN"
         inspection["frozen_at"] = self._now()
@@ -757,9 +1223,252 @@ class MoveOutProtocolV1(gl.Contract):
             "area_item_ids": inspection["area_item_ids"],
             "condition_record_ids": inspection["condition_record_ids"],
             "evidence_ids": inspection["evidence_ids"],
+            "capture_slot_ids": inspection.get("capture_slot_ids", []),
+            "maintenance_event_ids": inspection.get("maintenance_event_ids", []),
         }
         self.inspections[inspection_id] = self._json(inspection)
         self._append_event(inspection["property_id"], "INSPECTION_FROZEN", "inspection", inspection_id)
+
+    @gl.public.write
+    def submit_inspection_review(self, inspection_id: str, review_status: str,
+                                 note_ref: str, request_id: str) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        tenancy = self._require_participant(inspection["tenancy_id"])
+        if inspection["status"] != "FROZEN":
+            self._fail("MO_ERR_STATE", "review_requires_frozen_inspection")
+        state = self._enum(review_status, self.REVIEW_STATES, "review_status")
+        note = self._text(note_ref, u256(self.MAX_SOURCE_REF), "review_note_ref", allow_empty=True)
+        actor = self._sender()
+        side = self._require_same_participant_side(tenancy, actor)
+        payload = {"inspection_id": inspection_id, "review_status": state,
+                   "note_ref": note}
+        replay = self._idempotent_replay("submit_inspection_review", request_id, payload)
+        if replay:
+            return replay
+        key = inspection_id + "|" + actor
+        current_id = self.review_current_by_actor.get(key, "")
+        review_ids = json.loads(self.reviews_by_inspection.get(inspection_id, "[]"))
+        if current_id:
+            current = self._load(self.inspection_reviews, current_id, "inspection_review")
+            if current["review_status"] == state and current["note_ref"] == note:
+                self._remember("submit_inspection_review", request_id, payload, current_id)
+                return current_id
+        revisions = sum(
+            1 for review_id in review_ids
+            if json.loads(self.inspection_reviews[review_id])["actor"] == actor
+        )
+        if revisions >= int(self.MAX_REVIEW_REVISIONS_PER_ACTOR):
+            self._fail("MO_ERR_BOUNDS", "review_revisions_per_actor")
+        if len(review_ids) >= int(self.MAX_REVIEWS_PER_INSPECTION):
+            self._fail("MO_ERR_BOUNDS", "reviews_per_inspection")
+        review_id = self._new_id("REV", self.review_seq)
+        self.review_seq += u256(1)
+        self.inspection_reviews[review_id] = self._json({
+            "review_id": review_id, "property_id": inspection["property_id"],
+            "unit_id": inspection["unit_id"], "tenancy_id": tenancy["tenancy_id"],
+            "inspection_id": inspection_id, "actor": actor, "side": side,
+            "review_status": state, "note_ref": note,
+            "created_at": self._now(), "supersedes_review_id": current_id,
+        })
+        self._append(self.reviews_by_inspection, inspection_id, review_id,
+                     u256(self.MAX_REVIEWS_PER_INSPECTION), "reviews_per_inspection")
+        self.review_current_by_actor[key] = review_id
+        self._append_event(tenancy["property_id"], "INSPECTION_REVIEWED",
+                           "inspection_review", review_id)
+        self._remember("submit_inspection_review", request_id, payload, review_id)
+        return review_id
+
+    @gl.public.write
+    def create_disagreement(self, inspection_id: str, target_type: str,
+                            target_id: str, reason_ref: str,
+                            request_id: str) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        tenancy = self._require_participant(inspection["tenancy_id"])
+        if inspection["status"] != "FROZEN":
+            self._fail("MO_ERR_STATE", "disagreement_requires_frozen_inspection")
+        kind = self._enum(target_type, self.DISAGREEMENT_TARGET_TYPES, "disagreement_target_type")
+        target = self._text(target_id, u256(64), "disagreement_target_id")
+        reason = self._text(reason_ref, u256(self.MAX_SOURCE_REF),
+                            "disagreement_reason_ref", allow_empty=True)
+        area_id = ""
+        if kind == "INSPECTION":
+            if target != inspection_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "inspection_disagreement_target")
+        elif kind == "CONDITION_RECORD":
+            condition = self._load(self.condition_records, target, "condition_record")
+            if condition["inspection_id"] != inspection_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "condition_disagreement_target")
+            area_id = condition["area_item_id"]
+        else:
+            evidence = self._load(self.evidence_records, target, "evidence")
+            if evidence["inspection_id"] != inspection_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "evidence_disagreement_target")
+            area_id = evidence["area_item_id"]
+        payload = {"inspection_id": inspection_id, "target_type": kind,
+                   "target_id": target, "reason_ref": reason}
+        replay = self._idempotent_replay("create_disagreement", request_id, payload)
+        if replay:
+            return replay
+        disagreement_ids = json.loads(
+            self.disagreements_by_inspection.get(inspection_id, "[]")
+        )
+        if len(disagreement_ids) >= int(self.MAX_DISAGREEMENTS_PER_INSPECTION):
+            self._fail("MO_ERR_BOUNDS", "disagreements_per_inspection")
+        disagreement_id = self._new_id("DIS", self.disagreement_seq)
+        self.disagreement_seq += u256(1)
+        self.disagreements[disagreement_id] = self._json({
+            "disagreement_id": disagreement_id, "property_id": inspection["property_id"],
+            "unit_id": inspection["unit_id"], "tenancy_id": tenancy["tenancy_id"],
+            "inspection_id": inspection_id, "target_type": kind,
+            "target_id": target, "area_item_id": area_id,
+            "participant": self._sender(), "reason_ref": reason,
+            "created_at": self._now(),
+        })
+        self._append(self.disagreements_by_inspection, inspection_id, disagreement_id,
+                     u256(self.MAX_DISAGREEMENTS_PER_INSPECTION),
+                     "disagreements_per_inspection")
+        self._append_event(tenancy["property_id"], "INSPECTION_DISAGREEMENT_RECORDED",
+                           "disagreement", disagreement_id)
+        self._remember("create_disagreement", request_id, payload, disagreement_id)
+        return disagreement_id
+
+    @gl.public.write
+    def create_maintenance_event(self, inspection_id: str, area_item_id: str,
+                                 event_type: str, condition_record_id: str,
+                                 evidence_id: str, note_ref: str,
+                                 request_id: str) -> str:
+        kind = self._enum(event_type, self.MAINTENANCE_EVENT_TYPES,
+                          "maintenance_event_type")
+        condition_id = self._text(condition_record_id, u256(64),
+                                  "condition_record_id", allow_empty=True)
+        support_id = self._text(evidence_id, u256(64), "evidence_id", allow_empty=True)
+        note = self._text(note_ref, u256(self.MAX_TEXT), "maintenance_note_ref", allow_empty=True)
+        payload = {"inspection_id": inspection_id, "area_item_id": area_item_id,
+                   "event_type": kind, "condition_record_id": condition_id,
+                   "evidence_id": support_id, "note_ref": note}
+        replay = self._idempotent_replay("create_maintenance_event", request_id, payload)
+        if replay:
+            return replay
+        inspection, tenancy, area, room = self._record_parent_context(
+            inspection_id, area_item_id
+        )
+        if inspection["inspection_type"] != "MAINTENANCE":
+            self._fail("MO_ERR_STATE", "maintenance_event_requires_maintenance_inspection")
+        if not condition_id and not support_id:
+            self._fail("MO_ERR_SCHEMA", "maintenance_record_reference_required")
+        if condition_id:
+            condition = self._load(self.condition_records, condition_id, "condition_record")
+            condition_inspection = self._load(
+                self.inspections, condition["inspection_id"], "inspection"
+            )
+            if (condition["property_id"] != inspection["property_id"] or
+                    condition["unit_id"] != inspection["unit_id"] or
+                    condition["tenancy_id"] != tenancy["tenancy_id"] or
+                    condition["area_item_id"] != area_item_id or
+                    (condition["inspection_id"] != inspection_id and
+                     condition_inspection["status"] != "FROZEN")):
+                self._fail("MO_ERR_WRONG_SCOPE", "maintenance_condition_binding")
+        if support_id:
+            evidence = self._load(self.evidence_records, support_id, "evidence")
+            evidence_inspection = self._load(
+                self.inspections, evidence["inspection_id"], "inspection"
+            )
+            if (evidence["property_id"] != inspection["property_id"] or
+                    evidence["unit_id"] != inspection["unit_id"] or
+                    evidence["tenancy_id"] != tenancy["tenancy_id"] or
+                    evidence["area_item_id"] != area_item_id or
+                    (evidence["inspection_id"] != inspection_id and
+                     (evidence_inspection["status"] != "FROZEN" or
+                      evidence["status"] != "FROZEN"))):
+                self._fail("MO_ERR_WRONG_SCOPE", "maintenance_evidence_binding")
+        tenancy_maintenance_ids = json.loads(
+            self.maintenance_by_tenancy.get(tenancy["tenancy_id"], "[]")
+        )
+        if len(tenancy_maintenance_ids) >= int(self.MAX_MAINTENANCE_PER_TENANCY):
+            self._fail("MO_ERR_BOUNDS", "maintenance_events_per_tenancy")
+        maintenance_id = self._new_id("MAINT", self.maintenance_seq)
+        self.maintenance_seq += u256(1)
+        self.maintenance_events[maintenance_id] = self._json({
+            "maintenance_event_id": maintenance_id,
+            "property_id": inspection["property_id"], "unit_id": inspection["unit_id"],
+            "tenancy_id": tenancy["tenancy_id"], "inspection_id": inspection_id,
+            "room_id": room["room_id"], "area_item_id": area_item_id,
+            "condition_record_id": condition_id, "evidence_id": support_id,
+            "event_type": kind, "note_ref": note,
+            "created_by": self._sender(), "created_at": self._now(),
+        })
+        self._append(self.maintenance_by_tenancy, tenancy["tenancy_id"], maintenance_id,
+                     u256(self.MAX_MAINTENANCE_PER_TENANCY),
+                     "maintenance_events_per_tenancy")
+        self._append(self.maintenance_by_inspection, inspection_id, maintenance_id,
+                     u256(self.MAX_EVIDENCE_PER_INSPECTION),
+                     "maintenance_events_per_inspection")
+        self._add_inspection_membership(inspection, room["room_id"], area_item_id)
+        inspection["maintenance_event_ids"].append(maintenance_id)
+        self.inspections[inspection_id] = self._json(inspection)
+        self._append_event(tenancy["property_id"], "MAINTENANCE_EVENT_CREATED",
+                           "maintenance_event", maintenance_id)
+        self._remember("create_maintenance_event", request_id, payload, maintenance_id)
+        return maintenance_id
+
+    @gl.public.view
+    def get_inspection_completeness(self, inspection_id: str) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        return self._json(self._inspection_completeness(inspection))
+
+    @gl.public.view
+    def get_inspection_receipt(self, inspection_id: str) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        review_ids = json.loads(self.reviews_by_inspection.get(inspection_id, "[]"))
+        latest_reviews = []
+        for review_id in review_ids:
+            review = json.loads(self.inspection_reviews[review_id])
+            if self.review_current_by_actor.get(inspection_id + "|" + review["actor"], "") == review_id:
+                latest_reviews.append(review)
+        tenant_reviews = [row for row in latest_reviews if row["side"] == "TENANT"]
+        manager_reviews = [row for row in latest_reviews if row["side"] == "MANAGER"]
+        disagreement_ids = json.loads(
+            self.disagreements_by_inspection.get(inspection_id, "[]")
+        )
+        return self._json({
+            "property_id": inspection["property_id"], "unit_id": inspection["unit_id"],
+            "tenancy_id": inspection["tenancy_id"],
+            "inspection_id": inspection_id,
+            "inspection_type": inspection["inspection_type"],
+            "created_by": inspection["created_by"],
+            "created_at": inspection["created_at"],
+            "frozen_at": inspection["frozen_at"], "status": inspection["status"],
+            "manifest_counts": {
+                "rooms": len(inspection["room_ids"]),
+                "area_items": len(inspection["area_item_ids"]),
+                "condition_records": len(inspection["condition_record_ids"]),
+                "evidence": len(inspection["evidence_ids"]),
+                "capture_slots": len(inspection.get("capture_slot_ids", [])),
+                "maintenance_events": len(inspection.get("maintenance_event_ids", [])),
+            },
+            "membership_pages": {
+                "rooms": "list_inspection_rooms",
+                "area_items": "list_inspection_area_items",
+                "conditions": "list_condition_records",
+                "evidence": "list_evidence",
+                "capture_slots": "list_capture_slots",
+                "reviews": "list_inspection_reviews",
+                "disagreements": "list_disagreements",
+                "maintenance_events": "list_inspection_maintenance_events",
+            },
+            "review_status": latest_reviews,
+            "dual_review": {
+                "tenant_reviewed": bool(tenant_reviews),
+                "manager_reviewed": bool(manager_reviews),
+                "both_sides_reviewed": bool(tenant_reviews) and bool(manager_reviews),
+                "tenant_status": tenant_reviews[-1]["review_status"] if tenant_reviews else "NOT_REVIEWED",
+                "manager_statuses": [row["review_status"] for row in manager_reviews],
+            },
+            "disagreement_count": len(disagreement_ids),
+            "completeness": json.loads(self._json(self._inspection_completeness(inspection))),
+            "contents_committed": inspection["contents_committed"],
+            "interpretation": "Participant descriptions and metadata are claims, not established conditions.",
+        })
 
     @gl.public.view
     def get_property(self, property_id: str) -> str:
@@ -856,6 +1565,13 @@ class MoveOutProtocolV1(gl.Contract):
                           inspection_id, offset, limit)
 
     @gl.public.view
+    def list_condition_references(self, prior_condition_record_id: str,
+                                  offset: u256, limit: u256) -> str:
+        self._load(self.condition_records, prior_condition_record_id, "condition_record")
+        return self._page(self.conditions_by_prior_condition, self.condition_records,
+                          prior_condition_record_id, offset, limit)
+
+    @gl.public.view
     def list_evidence(self, inspection_id: str, offset: u256, limit: u256) -> str:
         return self._page(self.evidence_by_inspection, self.evidence_records,
                           inspection_id, offset, limit)
@@ -873,4 +1589,106 @@ class MoveOutProtocolV1(gl.Contract):
     def list_established_conditions(self, inspection_id: str,
                                     offset: u256, limit: u256) -> str:
         return self._page(self.findings_by_inspection, self.established_conditions,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def get_inspection_manifest(self, inspection_id: str) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        return self._json({
+            "inspection_id": inspection_id,
+            "status": inspection["status"],
+            "live_membership": {
+                "room_ids": inspection["room_ids"],
+                "area_item_ids": inspection["area_item_ids"],
+                "condition_record_ids": inspection["condition_record_ids"],
+                "evidence_ids": inspection["evidence_ids"],
+                "capture_slot_ids": inspection.get("capture_slot_ids", []),
+                "maintenance_event_ids": inspection.get("maintenance_event_ids", []),
+            },
+            "contents_committed": inspection["contents_committed"],
+        })
+
+    @gl.public.view
+    def get_capture_slot(self, capture_slot_id: str) -> str:
+        slot = self._load(self.capture_slots, capture_slot_id, "capture_slot")
+        slot["evidence_ids"] = json.loads(
+            self.evidence_by_capture_slot.get(capture_slot_id, "[]")
+        )
+        inspection = self._load(self.inspections, slot["inspection_id"], "inspection")
+        slot["status"] = "FROZEN" if inspection["status"] == "FROZEN" else "OPEN"
+        slot["continuity_semantics"] = "INTENDED_CORRESPONDENCE_NOT_SAME_AREA_PROOF"
+        return self._json(slot)
+
+    @gl.public.view
+    def get_inspection_review(self, review_id: str) -> str:
+        return self._json(self._load(self.inspection_reviews, review_id, "inspection_review"))
+
+    @gl.public.view
+    def get_disagreement(self, disagreement_id: str) -> str:
+        disagreement = self._load(self.disagreements, disagreement_id, "disagreement")
+        disagreement["counter_evidence_ids"] = json.loads(
+            self.counter_evidence_by_disagreement.get(disagreement_id, "[]")
+        )
+        return self._json(disagreement)
+
+    @gl.public.view
+    def get_maintenance_event(self, maintenance_event_id: str) -> str:
+        return self._json(self._load(
+            self.maintenance_events, maintenance_event_id, "maintenance_event"
+        ))
+
+    @gl.public.view
+    def list_inspection_rooms(self, inspection_id: str,
+                              offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.rooms_by_inspection, self.rooms,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_inspection_area_items(self, inspection_id: str,
+                                   offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.areas_by_inspection, self.area_items,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_capture_slots(self, inspection_id: str,
+                           offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.capture_slots_by_inspection, self.capture_slots,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_inspection_reviews(self, inspection_id: str,
+                                offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.reviews_by_inspection, self.inspection_reviews,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_disagreements(self, inspection_id: str,
+                           offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.disagreements_by_inspection, self.disagreements,
+                          inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_counter_evidence(self, disagreement_id: str,
+                              offset: u256, limit: u256) -> str:
+        self._load(self.disagreements, disagreement_id, "disagreement")
+        return self._page(self.counter_evidence_by_disagreement, self.evidence_records,
+                          disagreement_id, offset, limit)
+
+    @gl.public.view
+    def list_maintenance_events(self, tenancy_id: str,
+                                offset: u256, limit: u256) -> str:
+        self._load(self.tenancies, tenancy_id, "tenancy")
+        return self._page(self.maintenance_by_tenancy, self.maintenance_events,
+                          tenancy_id, offset, limit)
+
+    @gl.public.view
+    def list_inspection_maintenance_events(self, inspection_id: str,
+                                           offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        return self._page(self.maintenance_by_inspection, self.maintenance_events,
                           inspection_id, offset, limit)

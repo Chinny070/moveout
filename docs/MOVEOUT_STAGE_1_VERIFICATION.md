@@ -1,6 +1,6 @@
 # MoveOut Stage 1 verification record
 
-**Current status:** Stage 1.1 local hardening passed. No deployment; Stage 2 has not started.
+**Historical status:** Stage 1.1 local hardening passed. Stage 2 is now implemented and locally verified; its results are recorded in [`MOVEOUT_STAGE_2_VERIFICATION.md`](MOVEOUT_STAGE_2_VERIFICATION.md). No deployment has been performed.
 
 ## Source and runner
 
@@ -24,11 +24,11 @@ The script checks the complete test suite, GenVM lint, SDK validation, Python sy
 
 | Check | Result |
 |---|---|
-| `gltest tests -q` | PASS, 109 total (63 Stage 1 Direct Mode + 46 historical regression tests) |
+| `gltest tests -q` | Historical Stage 1.1 result: PASS, 109 total (63 Stage 1 Direct Mode + 46 historical regression tests). Current combined Stage 1 + historical + Stage 2 run: PASS, 145 total; see Stage 2 verification record. |
 | `gltest tests/test_moveout_protocol_v1.py -q` | PASS, 63 Stage 1 Direct Mode tests |
 | `pytest tests --ignore=tests/test_moveout_protocol_v1.py -q` | PASS, 46 historical tests |
 | `genvm-lint lint contracts/moveout_protocol_v1.py` | PASS, 3 checks |
-| `genvm-lint check contracts/moveout_protocol_v1.py` | PASS; 40 methods (23 views, 17 writes) |
+| `genvm-lint check contracts/moveout_protocol_v1.py` | Historical Stage 1.1 result: PASS; 40 methods (23 views, 17 writes). Current contract method count: 64; see Stage 2 verification record. |
 | `python -m compileall -q contracts tests` | PASS |
 | Production source scan | PASS; no nondeterministic or benchmark-specific selectors |
 | `git diff --check` | PASS |

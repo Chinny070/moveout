@@ -11,7 +11,7 @@ function Invoke-RequiredCheck([string]$Label, [string]$Executable, [string[]]$Ar
     }
 }
 
-Invoke-RequiredCheck 'Complete test suite (Direct Mode plus historical regressions)' 'gltest' @('tests', '-q')
+Invoke-RequiredCheck 'Complete suite (Stage 1, historical regressions, Stage 2)' 'gltest' @('tests', '-q')
 Invoke-RequiredCheck 'GenVM lint' 'genvm-lint' @('lint', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'GenVM SDK validation' 'genvm-lint' @('check', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'Python syntax compilation' 'python' @('-m', 'compileall', '-q', 'contracts', 'tests')
@@ -33,4 +33,4 @@ if ($LASTEXITCODE -ne 0) { throw "git diff --check failed with exit code $LASTEX
 & git diff --cached --check
 if ($LASTEXITCODE -ne 0) { throw "git diff --cached --check failed with exit code $LASTEXITCODE" }
 
-Write-Host "`nAll Stage 1 verification checks passed."
+Write-Host "`nAll deterministic MoveOut verification checks passed."
