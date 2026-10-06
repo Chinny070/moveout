@@ -46,7 +46,7 @@ Address strings are parsed as GenLayer `Address` values and stored in checksum f
 | Action | Authorized actor |
 |---|---|
 | Create a Property | Any address; it becomes the Property creator and permanent primary manager. |
-| Add or revoke managers | Property creator only; creator authority cannot be revoked. |
+| Add or revoke managers | Property creator only; creator authority cannot be revoked. An address that is the tenant of an open tenancy cannot also be made a manager of that Property. |
 | Create a Unit, Room, or Area/Item | Active Property manager. |
 | Create a Tenancy | Active Property manager; tenant is a designated address. |
 | Activate a DRAFT Tenancy | Designated tenant only; this records the tenant's acceptance of the protocol tenancy. |
@@ -68,7 +68,7 @@ The lifecycle is `DRAFT → ACTIVE → MOVE_OUT_PENDING → ENDED`; `DRAFT → C
 
 - A manager creates the draft and records the tenant, Property, Unit, and optional `start_metadata`.
 - The designated tenant alone activates the draft. Only one ACTIVE or MOVE_OUT_PENDING tenancy may occupy a Unit at a time. Duplicate open records for the same Unit/tenant pair are rejected.
-- Either participant can request move-out. The opposite party must confirm the end and may add bounded `end_metadata`.
+- Either participant can request move-out. If the tenant requested it, an active manager must confirm; if a manager requested it, the designated tenant must confirm. Another manager cannot counter-sign a manager's request. The confirmer may add bounded `end_metadata`.
 - Ending or cancelling frees the occupancy/pair indexes. A closed Tenancy cannot accept new Condition Records or Evidence.
 
 The optional start/end metadata is user-supplied context, not protocol time, proof of possession, lease terms, or a verified real-world date.
@@ -101,7 +101,7 @@ Evidence types are `PHOTO`, `VIDEO_REFERENCE`, `DOCUMENT_REFERENCE`, `RECEIPT`, 
 
 Evidence status moves from `SUBMITTED` to `FROZEN`. V1 has no evidence edit method even before freeze, so submitter, parent bindings, type, source reference, digest, and submission timestamp cannot be altered through the public ABI. The original submitter freezes it, recording protocol `frozen_at`. Repeating the same freeze is a no-op; another participant cannot freeze on the submitter's behalf.
 
-Supersession is append-only. The same submitter can submit a replacement only in another OPEN Inspection, for the same Property, Unit, Tenancy, Room, Area/Item, and evidence type. The prior item must already be frozen and not superseded. Freezing the replacement adds a separate `superseded_by` index entry and lifecycle event. It does not modify the prior Evidence JSON; reads show both the original and its supersession link. Supersession does not delete or conceal evidence.
+Supersession is append-only. The same submitter can submit a replacement only in another OPEN Inspection, for the same Property, Unit, Tenancy, Room, Area/Item, and evidence type. The prior item must already be frozen and not superseded. Freezing the replacement adds a separate `superseded_by` index entry and lifecycle event. It does not modify the prior Evidence JSON or the earlier inspection's `contents_committed`; `get_evidence` reports the later supersession link while the original evidence and historical membership remain intact. Supersession does not delete or conceal evidence. The link can only advance across a later inspection in the same tenancy, so its chain is limited by the 32-inspection-per-tenancy cap.
 
 ## Future Visual Observation and Established Condition schemas
 

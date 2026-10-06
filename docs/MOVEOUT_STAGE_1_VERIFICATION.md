@@ -1,46 +1,46 @@
 # MoveOut Stage 1 verification record
 
-**Status:** Local deterministic foundation verified; not deployed.
-**Network:** No network deployment or transaction was performed.
-**Canonical MoveOut contract:** Not deployed.
+**Current status:** Stage 1.1 local hardening passed. No deployment; Stage 2 has not started.
 
 ## Source and runner
 
 - Contract: `contracts/moveout_protocol_v1.py`
-- SHA-256: `164B885F576AB8CE097D091406D9A20521B9E87B341366B8B9FF952F8FCE800E`
+- Stage 1 baseline SHA-256: `164B885F576AB8CE097D091406D9A20521B9E87B341366B8B9FF952F8FCE800E`
+- Stage 1.1 final SHA-256: `EC5287A8AEE928CB024B44C3E649F45ADD17B811D357918957CF4330663724D6`
 - Pinned GenVM dependency: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
-- Local CLI versions: `genlayer 0.39.1`, `genvm-lint 0.11.0`; `gltest` uses the pinned dependency in the contract header.
+- Local CLI: `genlayer 0.39.1`, `genvm-lint 0.11.0`; GenVM dependency is pinned by the contract header.
 
-## Checks performed
+## Single verification entry point
+
+From the repository root in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify_stage1.ps1
+```
+
+The script checks the complete test suite, GenVM lint, SDK validation, Python syntax compilation, production-source nondeterminism/benchmark scans, and `git diff --check`. It needs local development tools, but no wallet, RPC, or StudioNet.
+
+## Final results
 
 | Check | Result |
 |---|---|
+| `gltest tests -q` | PASS, 109 total (63 Stage 1 Direct Mode + 46 historical regression tests) |
+| `gltest tests/test_moveout_protocol_v1.py -q` | PASS, 63 Stage 1 Direct Mode tests |
+| `pytest tests --ignore=tests/test_moveout_protocol_v1.py -q` | PASS, 46 historical tests |
 | `genvm-lint lint contracts/moveout_protocol_v1.py` | PASS, 3 checks |
 | `genvm-lint check contracts/moveout_protocol_v1.py` | PASS; 40 methods (23 views, 17 writes) |
-| `gltest tests/test_moveout_protocol_v1.py -q` | PASS, 52 Direct Mode tests |
-| `pytest tests --ignore=tests/test_moveout_protocol_v1.py -q` | PASS, 46 existing tests |
-| `python -m py_compile contracts/moveout_protocol_v1.py tests/test_moveout_protocol_v1.py` | PASS |
+| `python -m compileall -q contracts tests` | PASS |
+| Production source scan | PASS; no nondeterministic or benchmark-specific selectors |
 | `git diff --check` | PASS |
-| Contract scan for nondeterministic calls and benchmark-specific selectors | No matches |
 
-A combined `gltest tests -q` collection was also attempted and is not a passing gate: legacy tests install a synthetic `genlayer` stub in `sys.modules`, which contaminates collection of the pinned Direct Mode SDK tests. The two suites pass when run in separate processes as above. This is a test isolation limitation, not evidence of StudioNet compatibility.
+The previously combined suite failed because Stage 0.7, 0.8, and 0.9 historical tests left a fake `genlayer` module in `sys.modules` after importing experimental contract classes. The Stage 1 Direct Mode loader then received that incomplete stub and raised `NameError: TreeMap`. Stage 1.1 scopes each legacy stub to the import using `try/finally` and restores the prior module state. The aggregate run now passes without changing the production loader or weakening Stage 1 tests. See [`MOVEOUT_STAGE_1_1_HARDENING.md`](MOVEOUT_STAGE_1_1_HARDENING.md) for reproduction and audit findings.
 
-## Scope and adversarial coverage
+## Boundaries
 
-The 52 Stage 1 Direct Mode tests cover hierarchy and parent binding; property manager creation, authorization, revocation and limits; tenancy activation, occupancy, move-out request/confirmation and replay; inspection type/state/creator/cancellation/freeze rules; room and area identity; participant Condition Records; Evidence digest shape, duplicate detection, submitter-only freeze, append-only supersession and inspection snapshot; cross-property/unit/tenancy/area rejection; closed tenancy restrictions; idempotency; bounded pagination; protocol timestamps and append-only history; and absence of a public Visual Observation or Established Condition writer.
-
-The Stage 1 suite includes the specified adversarial scenarios, extended with replay, cross-scope, index, and record-separation cases. Test success verifies deterministic behavior in local Direct Mode only.
-
-## Important boundaries
-
-- No StudioNet deployment, hosted transaction, validator consensus, receipt/finality, or authoritative reread was performed.
-- No GenLayer vision execution or visual accuracy was tested in Stage 1. Stage 0 experimental results remain separate and do not become production adjudication.
-- Evidence is a source reference plus caller-supplied SHA-256 digest. The contract does not retrieve evidence or verify a digest against remote bytes.
-- The Visual Observation and Established Condition stores have no public writer. No participant can self-assert a validator observation or protocol finding.
-- Manager role is an in-protocol authority designation, not verified legal ownership.
-- History and child collections have explicit caps; writes fail closed at the cap. Deployment-scale gas/storage behavior remains unmeasured.
-- The aggregate test command has the isolation issue described above; it must be repaired before relying on a single aggregate suite invocation.
-
-## Deployment and next stage
-
-No contract address or transaction ID exists for this Stage 1 source. It is an un-deployed local foundation only. Stage 2 has not started. Before a later visual adjudication stage, implement and verify the trusted observation/finding writer, evidence retrieval and digest binding, consensus/finality references, and its promotion rules; Stage 0.9 did not establish general property-visual accuracy.
+- No StudioNet deployment, hosted transaction, consensus, receipt/finality, or authoritative reread was performed.
+- No Stage 1 contract or canonical MoveOut contract was deployed.
+- Evidence remains a source reference plus caller-provided SHA-256; remote bytes are not fetched or checked against the digest.
+- No production visual adjudication or observation/finding writer exists.
+- Direct Mode and static checks do not prove StudioNet execution or max-scale storage/gas behavior. Exact maxima of all child collections and the 1024-event history cap were not exercised because that would require thousands of state writes; the implementation checks limits before appending.
+- History is append-only and never evicts; event-producing writes fail closed once a Property reaches 1024 events. Idempotency storage is persistent and has no global pruning mechanism.
+- General real-world property visual accuracy remains unverified, separate from this deterministic foundation.

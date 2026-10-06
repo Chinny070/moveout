@@ -15,21 +15,24 @@ class _Decorators:
         return function
 
 
-_genlayer_stub = types.ModuleType("genlayer")
-_genlayer_stub.gl = types.SimpleNamespace(
-    Contract=object,
-    public=_Decorators(),
-)
-sys.modules.setdefault("genlayer", _genlayer_stub)
-
 _contract_path = (
     Path(__file__).resolve().parents[1]
     / "contracts"
     / "moveout_visual_safety_stage07_v2.py"
 )
-_spec = importlib.util.spec_from_file_location("moveout_stage07_v2_contract", _contract_path)
-_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_module)
+_genlayer_stub = types.ModuleType("genlayer")
+_genlayer_stub.gl = types.SimpleNamespace(Contract=object, public=_Decorators())
+_previous_genlayer = sys.modules.get("genlayer")
+try:
+    sys.modules["genlayer"] = _genlayer_stub
+    _spec = importlib.util.spec_from_file_location("moveout_stage07_v2_contract", _contract_path)
+    _module = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_module)
+finally:
+    if _previous_genlayer is None:
+        sys.modules.pop("genlayer", None)
+    else:
+        sys.modules["genlayer"] = _previous_genlayer
 _contract_class = _module.MoveOutVisualSafetyStage07V2
 
 

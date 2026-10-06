@@ -88,6 +88,24 @@ def test_reused_request_id_with_different_payload_fails(world):
         world["contract"].create_property("Different House", "prop-create-1")
 
 
+def test_idempotency_scopes_keys_by_caller_and_method(world):
+    c = world["contract"]
+    bob_property = ""
+    with world["vm"].prank(world["bob"]):
+        bob_property = c.create_property("Bob House", "shared-key")
+    alice_unit = c.create_unit(world["property"], "Shared Key Unit", "shared-key")
+    assert bob_property != world["property"]
+    assert json.loads(c.get_unit(alice_unit))["property_id"] == world["property"]
+
+
+def test_failed_creation_does_not_consume_idempotency_key(world):
+    c = world["contract"]
+    with world["vm"].expect_revert("MO_ERR_BOUNDS"):
+        c.create_property("x" * (c.MAX_LABEL + 1), "retry-after-failure")
+    property_id = c.create_property("Valid After Failure", "retry-after-failure")
+    assert json.loads(c.get_property(property_id))["property_label"] == "Valid After Failure"
+
+
 def test_create_unit_and_reject_nonexistent_property(world):
     c = world["contract"]
     unit_id = c.create_unit(world["property"], "Apartment 4B", "unit-create-2")
@@ -101,12 +119,25 @@ def test_duplicate_unit_label_is_rejected(world):
         world["contract"].create_unit(world["property"], "Main House", "unit-duplicate")
 
 
+def test_unit_label_string_boundary(world):
+    c = world["contract"]
+    accepted = c.create_unit(world["property"], "x" * c.MAX_LABEL, "unit-label-max")
+    assert len(json.loads(c.get_unit(accepted))["unit_label"]) == c.MAX_LABEL
+    with world["vm"].expect_revert("MO_ERR_BOUNDS"):
+        c.create_unit(world["property"], "x" * (c.MAX_LABEL + 1), "unit-label-max-plus-one")
+
+
 def test_tenant_cannot_create_units_or_manage_property(world):
     with world["vm"].prank(world["bob"]):
         with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
             world["contract"].create_unit(world["property"], "Tenant Unit", "tenant-unit")
         with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
             world["contract"].add_manager(world["property"], address(world["charlie"]))
+
+
+def test_open_tenant_cannot_be_promoted_to_manager(world):
+    with world["vm"].expect_revert("MO_ERR_STATE"):
+        world["contract"].add_manager(world["property"], address(world["bob"]))
 
 
 def test_creator_can_authorize_and_revoke_manager_without_changing_creator(world):
@@ -124,6 +155,16 @@ def test_creator_can_authorize_and_revoke_manager_without_changing_creator(world
     managers = json.loads(c.list_managers(world["property"]))["items"]
     charlie = next(row for row in managers if row["address"].lower() == address(world["charlie"]).lower())
     assert charlie["active"] is False
+
+
+def test_manager_authority_boundary_includes_creator(world):
+    c = world["contract"]
+    for index in range(1, int(c.MAX_MANAGERS_PER_PROPERTY)):
+        manager = "0x" + format(index, "040x")
+        c.add_manager(world["property"], manager)
+    assert len(json.loads(c.list_managers(world["property"]))["items"]) == c.MAX_MANAGERS_PER_PROPERTY
+    with world["vm"].expect_revert("MO_ERR_BOUNDS"):
+        c.add_manager(world["property"], "0x" + format(99, "040x"))
 
 
 def test_manager_action_replay_is_rejected(world):
@@ -180,6 +221,18 @@ def test_tenancy_move_out_requires_other_party_confirmation(world):
             c.confirm_tenancy_end(world["tenancy"], "tenant end note")
     c.confirm_tenancy_end(world["tenancy"], "manager end note")
     assert json.loads(c.get_tenancy(world["tenancy"]))["status"] == "ENDED"
+
+
+def test_manager_move_out_request_requires_tenant_even_with_multiple_managers(world):
+    c = world["contract"]
+    c.add_manager(world["property"], address(world["charlie"]))
+    c.request_move_out(world["tenancy"])
+    with world["vm"].prank(world["charlie"]):
+        with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
+            c.confirm_tenancy_end(world["tenancy"], "other manager cannot counter-sign")
+    with world["vm"].prank(world["bob"]):
+        c.confirm_tenancy_end(world["tenancy"], "tenant counter-signs")
+    assert json.loads(c.get_tenancy(world["tenancy"]))["ended_by"].lower() == address(world["bob"]).lower()
 
 
 def test_tenancy_end_replay_cannot_silently_change_metadata(world):
@@ -329,6 +382,15 @@ def test_submit_evidence_validates_digest_and_stores_provenance_only(world):
     assert "body" not in evidence
 
 
+def test_source_reference_accepts_exact_limit(world):
+    c = world["contract"]
+    inspection_id = make_inspection(world)
+    _, area_id = make_room_area(world)
+    source_ref = "x" * c.MAX_SOURCE_REF
+    evidence_id = make_evidence(world, inspection_id, area_id, source=source_ref)
+    assert len(json.loads(c.get_evidence(evidence_id))["source_ref"]) == c.MAX_SOURCE_REF
+
+
 def test_malformed_sha256_rejected(world):
     c = world["contract"]
     inspection_id = make_inspection(world)
@@ -360,7 +422,7 @@ def test_evidence_freeze_is_submitter_only_and_immutable(world):
     _, area_id = make_room_area(world)
     with world["vm"].prank(world["bob"]):
         evidence_id = make_evidence(world, inspection_id, area_id, request="tenant-photo")
-    before = c.get_evidence(evidence_id)
+    before = json.loads(c.get_evidence(evidence_id))
     with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
         c.freeze_evidence(evidence_id)
     with world["vm"].prank(world["bob"]):
@@ -368,8 +430,13 @@ def test_evidence_freeze_is_submitter_only_and_immutable(world):
         c.freeze_evidence(evidence_id)
     after = json.loads(c.get_evidence(evidence_id))
     assert after["status"] == "FROZEN"
-    assert after["source_ref"] == json.loads(before)["source_ref"]
-    assert after["expected_sha256"] == json.loads(before)["expected_sha256"]
+    for field in (
+        "evidence_id", "property_id", "unit_id", "tenancy_id", "inspection_id",
+        "room_id", "area_item_id", "condition_record_id", "submitter",
+        "evidence_type", "source_ref", "expected_sha256", "submitted_at",
+        "supersedes_evidence_id",
+    ):
+        assert after[field] == before[field]
     assert after["submitter"] == json.loads(c.get_tenancy(world["tenancy"]))["tenant"]
 
 
@@ -402,10 +469,25 @@ def test_evidence_supersession_preserves_old_frozen_record(world):
     c.freeze_evidence(replacement_id)
     old = json.loads(c.get_evidence(old_id))
     new = json.loads(c.get_evidence(replacement_id))
+    frozen_membership = json.loads(c.get_inspection(old_inspection))["contents_committed"]
     assert old["status"] == "FROZEN"
     assert old["expected_sha256"] == SHA
     assert old["superseded_by_evidence_id"] == replacement_id
     assert new["supersedes_evidence_id"] == old_id
+    assert frozen_membership["evidence_ids"] == [old_id]
+
+
+def test_evidence_cannot_be_superseded_inside_its_own_inspection(world):
+    c = world["contract"]
+    inspection_id = make_inspection(world)
+    _, area_id = make_room_area(world)
+    old_id = make_evidence(world, inspection_id, area_id, request="same-inspection-old")
+    c.freeze_evidence(old_id)
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        make_evidence(
+            world, inspection_id, area_id, supersedes=old_id,
+            sha="b" * 64, request="same-inspection-replacement",
+        )
 
 
 def test_different_submitter_cannot_supersede_frozen_evidence(world):
@@ -466,6 +548,9 @@ def test_only_inspection_creator_can_freeze(world):
     with world["vm"].prank(world["bob"]):
         with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
             c.freeze_inspection(inspection_id)
+    with world["vm"].prank(world["charlie"]):
+        with world["vm"].expect_revert("MO_ERR_UNAUTHORIZED"):
+            c.freeze_inspection(inspection_id)
 
 
 def test_inspection_cancel_requires_empty_open_inspection(world):
@@ -491,6 +576,19 @@ def test_cross_property_area_reference_rejected(world):
         c.create_condition_record(inspection_id, other_area, "OTHER", "", "", "cross-prop-cond")
 
 
+def test_cross_property_room_area_cannot_be_added_to_other_tenancy_inspection(world):
+    c = world["contract"]
+    inspection_id = make_inspection(world)
+    other_property = c.create_property("Foreign Property", "foreign-property")
+    other_unit = c.create_unit(other_property, "Foreign Unit", "foreign-unit")
+    other_room = c.create_room(other_unit, "Bedroom", "foreign-room")
+    other_area = c.create_area_item(other_room, "WALL", "North", "", "foreign-area")
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        make_evidence(world, inspection_id, other_area, request="foreign-area-evidence")
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        c.create_condition_record(inspection_id, other_area, "OTHER", "", "", "foreign-area-condition")
+
+
 def test_cross_unit_area_reference_rejected(world):
     c = world["contract"]
     inspection_id = make_inspection(world)
@@ -498,6 +596,10 @@ def test_cross_unit_area_reference_rejected(world):
     _, area_id = make_room_area(world, second_unit, "Kitchen", "Sink")
     with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
         make_evidence(world, inspection_id, area_id, request="cross-unit-evidence")
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        c.create_condition_record(
+            inspection_id, area_id, "OTHER", "", "", "cross-unit-condition"
+        )
 
 
 def test_cross_tenancy_condition_evidence_binding_rejected(world):
@@ -531,6 +633,43 @@ def test_condition_record_must_match_evidence_area_and_inspection(world):
     with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
         make_evidence(world, inspection_id, area_b, condition_id=condition_id,
                       sha="b" * 64, request="condition-wrong-area")
+
+
+def test_evidence_cannot_attach_condition_from_another_inspection(world):
+    c = world["contract"]
+    inspection_a = make_inspection(world, request="claim-inspection-a")
+    inspection_b = c.create_inspection(world["tenancy"], "MAINTENANCE", "claim-inspection-b")
+    _, area_id = make_room_area(world)
+    condition_id = c.create_condition_record(
+        inspection_a, area_id, "OTHER", "", "", "claim-on-inspection-a"
+    )
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        make_evidence(
+            world, inspection_b, area_id, condition_id=condition_id,
+            sha="b" * 64, request="evidence-cross-inspection-condition",
+        )
+
+
+def test_evidence_cannot_supersede_across_tenancies(world):
+    c = world["contract"]
+    old_inspection = make_inspection(world, request="tenant-a-old-inspection")
+    _, old_area = make_room_area(world)
+    old_evidence = make_evidence(world, old_inspection, old_area, request="tenant-a-old-evidence")
+    c.freeze_evidence(old_evidence)
+    c.freeze_inspection(old_inspection)
+    other_unit = c.create_unit(world["property"], "Other Unit", "tenant-b-unit")
+    other_tenancy = c.create_tenancy(
+        world["property"], other_unit, address(world["bob"]), "", "tenant-b-tenancy"
+    )
+    with world["vm"].prank(world["bob"]):
+        c.activate_tenancy(other_tenancy)
+    other_inspection = c.create_inspection(other_tenancy, "MOVE_IN", "tenant-b-inspection")
+    _, other_area = make_room_area(world, other_unit, "Bedroom", "Wall")
+    with world["vm"].expect_revert("MO_ERR_WRONG_SCOPE"):
+        make_evidence(
+            world, other_inspection, other_area, supersedes=old_evidence,
+            sha="b" * 64, request="cross-tenancy-supersession",
+        )
 
 
 def test_visual_observation_and_established_finding_have_no_public_writer(world):
@@ -635,6 +774,8 @@ def test_closed_tenancy_cannot_accept_new_records(world):
     c.confirm_tenancy_end(world["tenancy"], "done")
     with world["vm"].expect_revert("MO_ERR_STATE"):
         c.create_condition_record(inspection_id, area_id, "OTHER", "", "", "ended-condition")
+    with world["vm"].expect_revert("MO_ERR_STATE"):
+        make_evidence(world, inspection_id, area_id, request="ended-evidence")
 
 
 def test_separate_tenancies_do_not_share_inspections_or_evidence(world):

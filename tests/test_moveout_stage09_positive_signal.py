@@ -1,15 +1,37 @@
 """Stage 0.9 class-specific evidence, safety, and equivalence gates."""
 
 import importlib.util
+import sys
+import types
 from pathlib import Path
 import unittest
+
+
+class _Decorators:
+    @staticmethod
+    def write(function):
+        return function
+
+    @staticmethod
+    def view(function):
+        return function
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
     "moveout_stage09_contract", ROOT / "contracts" / "moveout_visual_safety_stage09_v2.py"
 )
 MODULE = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MODULE)
+_previous_genlayer = sys.modules.get("genlayer")
+try:
+    _genlayer_stub = types.ModuleType("genlayer")
+    _genlayer_stub.gl = types.SimpleNamespace(Contract=object, public=_Decorators())
+    sys.modules["genlayer"] = _genlayer_stub
+    SPEC.loader.exec_module(MODULE)
+finally:
+    if _previous_genlayer is None:
+        sys.modules.pop("genlayer", None)
+    else:
+        sys.modules["genlayer"] = _previous_genlayer
 Stage09 = MODULE.MoveOutVisualSafetyStage09V2
 
 

@@ -298,6 +298,11 @@ class MoveOutProtocolV1(gl.Contract):
             self._fail("MO_ERR_SCHEMA", "manager_address")
         if manager == self.ZERO_ADDRESS:
             self._fail("MO_ERR_SCHEMA", "manager_address_zero")
+        for tenancy_id in json.loads(self.tenancies_by_property.get(property_id, "[]")):
+            tenancy = json.loads(self.tenancies[tenancy_id])
+            if (tenancy["tenant"] == manager and
+                    tenancy["status"] not in ("ENDED", "CANCELLED")):
+                self._fail("MO_ERR_STATE", "open_tenant_cannot_become_manager")
         key = property_id + "|" + manager
         if key in self.manager_authority and self.manager_authority[key]:
             self._fail("MO_ERR_DUPLICATE", "manager")
@@ -461,6 +466,11 @@ class MoveOutProtocolV1(gl.Contract):
             self._fail("MO_ERR_STATE", "move_out_not_pending")
         if tenancy["move_out_requested_by"] == self._sender():
             self._fail("MO_ERR_UNAUTHORIZED", "counterparty_confirmation_required")
+        if tenancy["move_out_requested_by"] == tenancy["tenant"]:
+            if not self._is_manager(tenancy["property_id"], self._sender()):
+                self._fail("MO_ERR_UNAUTHORIZED", "manager_counterparty_required")
+        elif self._sender() != tenancy["tenant"]:
+            self._fail("MO_ERR_UNAUTHORIZED", "designated_tenant_counterparty_required")
         tenancy["status"] = "ENDED"
         tenancy["end_metadata"] = note
         tenancy["ended_at"] = self._now()
@@ -655,6 +665,7 @@ class MoveOutProtocolV1(gl.Contract):
                     old_evidence["property_id"] != inspection["property_id"] or
                     old_evidence["unit_id"] != inspection["unit_id"] or
                     old_evidence["tenancy_id"] != inspection["tenancy_id"] or
+                    old_evidence["inspection_id"] == inspection_id or
                     old_evidence["room_id"] != room["room_id"] or
                     old_evidence["area_item_id"] != area_item_id or
                     old_evidence["evidence_type"] != kind or
@@ -711,6 +722,7 @@ class MoveOutProtocolV1(gl.Contract):
                     old["property_id"] != evidence["property_id"] or
                     old["unit_id"] != evidence["unit_id"] or
                     old["tenancy_id"] != evidence["tenancy_id"] or
+                    old["inspection_id"] == evidence["inspection_id"] or
                     old["room_id"] != evidence["room_id"] or
                     old["area_item_id"] != evidence["area_item_id"] or
                     old["evidence_type"] != evidence["evidence_type"]):

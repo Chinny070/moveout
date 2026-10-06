@@ -17,20 +17,24 @@ class _Decorators:
         return function
 
 
-if "genlayer" not in sys.modules:
-    _genlayer_stub = types.ModuleType("genlayer")
-    _genlayer_stub.gl = types.SimpleNamespace(Contract=object, public=_Decorators())
-    sys.modules["genlayer"] = _genlayer_stub
-
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_contract(filename, class_name, module_name):
     path = ROOT / "contracts" / filename
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    previous_genlayer = sys.modules.get("genlayer")
+    try:
+        stub = types.ModuleType("genlayer")
+        stub.gl = types.SimpleNamespace(Contract=object, public=_Decorators())
+        sys.modules["genlayer"] = stub
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        if previous_genlayer is None:
+            sys.modules.pop("genlayer", None)
+        else:
+            sys.modules["genlayer"] = previous_genlayer
     return getattr(module, class_name)
 
 
