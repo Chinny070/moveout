@@ -97,3 +97,19 @@ All 14 transaction receipts reached `FINALIZED`. Majority agreement was not unan
 Stage 0.7 reused these 14 frozen pairs and expected labels with a separate disposable observation-first contract. Its 15-field observation schema, conservative custom equivalence, hosted receipts, and per-case results are documented in [MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md](MOVEOUT_STAGE_0_7_VISUAL_SAFETY.md) and [`stage07_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage07_v2_results.ndjson).
 
 All 14 cases reached an accepted result and 13 recovered receipts confirm majority agreement and finality; case 4's accepted state was authoritatively reread, but its receipt was not recovered. Seven of 14 matched the frozen labels (50%, the same match rate as Stage 0.6B's 5/10 accepted results). Stage 0.7 avoided the Stage 0.6B false `NEW_DAMAGE` result for the shadow case and detected the image-text injection, but the ambiguous-mark case still produced a false `WORSENED` result. The contract therefore remains **WEAK** for condition classification, and Stage 1 remains **NOT READY**. A CLI stderr exception prevented recovery of case 4's transaction hash and votes; that evidence gap is recorded in the Stage 0.7 report.
+
+## Stage 0.8 follow-up — explicit worsening evidence
+
+Stage 0.8 added same-defect identity, named visible-change evidence, severity-increase confirmation, and independent validator comparison of those predicates. On the final v2 run, 14/14 receipts finalized: 12 majority agreed and 2 disagreed. There were zero false `NEW_DAMAGE`, `WORSENED`, or `REPAIRED` outcomes. The clear worsening fixture (case 6) remained `WORSENED` with independently supported `LENGTH_INCREASE`; two unchanged fixtures remained `UNCHANGED`; the ambiguous mark (case 12) and shadow (case 14) finalized as majority disagreement without accepting a new state. The frozen new-damage and pre-existing cases did not reach their positive labels, so overall controlled safety is rated **WEAK** despite passing the dangerous-false-positive gate. See [MOVEOUT_STAGE_0_8_WORSENING_SAFETY.md](MOVEOUT_STAGE_0_8_WORSENING_SAFETY.md), [`stage08_v2_results.ndjson`](../benchmarks/controlled-property-2026-10/stage08_v2_results.ndjson), and the [Stage 0.8 transaction diagnostics](../benchmarks/controlled-property-2026-10/stage08_v2_pending.ndjson).
+
+| Metric | Stage 0.6B | Stage 0.7 | Stage 0.8 final v2 |
+|---|---:|---:|---:|
+| Majority agree / disagree | 10 / 4 | 13 confirmed agree; case 4 receipt unavailable | 12 / 2 |
+| Accepted-label matches | 5 / 10 | 7 / 14 | 7 / 14 attempts |
+| False `NEW_DAMAGE` | 1 | 0 | 0 |
+| False `WORSENED` | 1 | 1 | 0 |
+| False `REPAIRED` | 0 accepted | 0 | 0 |
+| Clear worsening preserved | 1 correct plus one ambiguous false positive | 0 / 1 | 1 / 1 |
+| Clear unchanged preserved | 1 / 3 | 0 / 3 | 2 / 3 |
+
+Stage 0.8 is a safety improvement over Stage 0.7 for the ambiguous case, while its failure to classify any frozen `NEW_DAMAGE` or `PRE_EXISTING` pair limits its usefulness. Real-world property accuracy remains unverified and Stage 1 remains **NOT READY**.

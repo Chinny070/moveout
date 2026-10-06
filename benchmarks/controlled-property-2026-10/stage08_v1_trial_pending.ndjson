@@ -1,0 +1,4 @@
+{"case_id":"MOV-SYN-11","tx_id":"0xcf67325c0ad3feb45a513bc972ff5fdbd70d11f6a8ddf0a2eb90a325a704dfd6","submitted_utc":"2026-10-06T00:00:00Z","write_exit":1,"write_output_warning":"CLI returned HTML instead of JSON; transaction hash captured in Write Transaction Hash output; receipt requires verification."}
+{"case_id":"MOV-SYN-12","tx_id":"0x33741bccddf7697e942df02fb60bc1b75b84dd8c7184933b45d210c4dd4536d8","submitted_utc":"2026-10-06T10:38:43.1086747Z","write_exit":0,"write_output_warning":""}
+{"case_id":"MOV-SYN-13","tx_id":"0xa3d0696e51fd78981b49b7ae74ff4f78d20fea79e2721358d32b475be962f260","submitted_utc":"2026-10-06T10:40:59.2969533Z","write_exit":0,"write_output_warning":""}
+{"case_id":"MOV-SYN-14","tx_id":"0x377e4802efb8242b2ed6ca9339a6d517f7c5f03b3201d38015632f62b6a73688","submitted_utc":"2026-10-06T10:42:25.0563980Z","write_exit":0,"write_output_warning":""}
