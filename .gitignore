@@ -30,6 +30,9 @@ target/
 coverage/
 .coverage
 *.egg-info/
+.pytest_cache/
+.hypothesis/
+artifacts/
 
 # Local runtime, logs, and editor state
 .genlayer/
