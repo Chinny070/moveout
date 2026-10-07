@@ -1,14 +1,20 @@
-"""Guard the narrow Stage 3 nondeterministic scope in the MoveOut contract."""
+"""Guard the narrow Stage 4 nondeterministic scope in the MoveOut contract."""
 
 import ast
 from pathlib import Path
 
 
 CONTRACT = Path("contracts/moveout_protocol_v1.py")
-ALLOWED_CALLS = {
-    "gl.nondet.web.get": "_retrieve_and_verify_evidence",
-    "gl.vm.run_nondet_unsafe": "verify_evidence_provenance",
-}
+ALLOWED_CALLS = [
+    ("gl.nondet.web.get", "_retrieve_and_verify_evidence"),
+    ("gl.nondet.web.get", "_observe_single"),
+    ("gl.nondet.web.get", "get_checked"),
+    ("gl.nondet.exec_prompt", "_observe_single"),
+    ("gl.nondet.exec_prompt", "_observe_pair"),
+    ("gl.vm.run_nondet_unsafe", "verify_evidence_provenance"),
+    ("gl.vm.run_nondet_unsafe", "observe_evidence"),
+    ("gl.vm.run_nondet_unsafe", "observe_evidence_pair"),
+]
 
 
 def dotted_name(node):
@@ -31,7 +37,7 @@ class ScopeVisitor(ast.NodeVisitor):
         self.functions.append(node.name)
         if any(dotted_name(item) == "gl.public.write" for item in node.decorator_list):
             if any(word in node.name.lower()
-                   for word in ("observation", "finding", "established_condition")):
+                   for word in ("finding", "established_condition")):
                 self.forbidden_writers.append(node.name)
         self.generic_visit(node)
         self.functions.pop()
@@ -52,15 +58,15 @@ def main():
     visitor = ScopeVisitor()
     visitor.visit(tree)
     errors = []
-    expected = sorted((call, function) for call, function in ALLOWED_CALLS.items())
+    expected = sorted(ALLOWED_CALLS)
     actual = sorted(visitor.nondeterministic_calls)
     if actual != expected:
-        errors.append(f"nondeterministic API calls differ from Stage 3 allowlist: {actual!r}")
+        errors.append(f"nondeterministic API calls differ from Stage 4 allowlist: {actual!r}")
     if visitor.forbidden_writers:
         errors.append(f"visual observation/finding public writers found: {visitor.forbidden_writers!r}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print("Stage 3 scope passed: one web.get + one custom validator; no prompt or finding writer")
+    print("Stage 4 scope passed: bounded retrieval/vision/custom validators; no finding writer")
 
 
 if __name__ == "__main__":

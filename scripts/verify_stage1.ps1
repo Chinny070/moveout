@@ -11,14 +11,14 @@ function Invoke-RequiredCheck([string]$Label, [string]$Executable, [string[]]$Ar
     }
 }
 
-Invoke-RequiredCheck 'Complete suite (Stage 1, historical regressions, Stages 2–3 direct tests)' 'gltest' @('tests', '-q')
+Invoke-RequiredCheck 'Complete suite (Stage 1, historical regressions, Stages 2–4 direct tests)' 'gltest' @('tests', '-q')
 Invoke-RequiredCheck 'GenVM lint' 'genvm-lint' @('lint', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'GenVM SDK validation' 'genvm-lint' @('check', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'Python syntax compilation' 'python' @('-m', 'compileall', '-q', 'contracts', 'tests')
 
-Write-Host "`n== Stage 3 nondeterministic scope scan =="
-& python 'scripts/check_stage3_scope.py'
-if ($LASTEXITCODE -ne 0) { throw "Stage 3 scope scan failed with exit code $LASTEXITCODE" }
+Write-Host "`n== Stage 4 nondeterministic scope scan =="
+& python 'scripts/check_stage4_scope.py'
+if ($LASTEXITCODE -ne 0) { throw "Stage 4 scope scan failed with exit code $LASTEXITCODE" }
 
 Write-Host "`n== Benchmark-specific production logic scan =="
 $benchmarkSelectors = 'MOV-SYN|expected_label|benchmark_manifest'

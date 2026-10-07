@@ -1,4 +1,4 @@
-# Full offline verification for MoveOut, including deterministic regressions and Stage 2–3 direct tests.
+# Full offline verification for MoveOut, including deterministic regressions and Stage 2–4 direct tests.
 $ErrorActionPreference = 'Stop'
 $scriptPath = Join-Path $PSScriptRoot 'verify_stage1.ps1'
 & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath
