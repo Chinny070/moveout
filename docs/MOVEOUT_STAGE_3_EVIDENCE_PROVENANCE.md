@@ -8,6 +8,10 @@ The Stage 2 evidence record is frozen before verification. Its source URL and ca
 
 ## Contract behavior
 
+### Current GenLayer API verification
+
+The current official [Fetch Web Content example](https://docs.genlayer.com/developers/intelligent-contracts/examples/fetch-web-content) places `gl.nondet.web.get(url)` inside a nondeterministic function and consumes `response.body`; the current [Web Access reference](https://docs.genlayer.com/developers/intelligent-contracts/features/web-access) says leaders and validators make independent requests and recommends returning stable derived summaries. The official reference demonstrates body access and independent retrieval, while the installed/deployed StudioNet runtime was additionally checked for the fields used here: `status`, `headers`, and byte-valued `body`. GenVM lint and SDK validation passed, and hosted StudioNet reads observed both HTTP 200 and HTTP 404 through `response.status`, image MIME metadata through `response.headers`, and original image bytes through `response.body`. The custom validator pattern follows the documented [nondeterminism and custom-validator guidance](https://docs.genlayer.com/developers/intelligent-contracts/features/non-determinism). No `gl.get_webpage`, custom backend fetcher, screenshot identity, or LLM is used.
+
 `verify_evidence_provenance(tenancy_id, evidence_id, request_id)` requires:
 
 - the caller to be a participant in the tenancy;
@@ -39,7 +43,7 @@ Direct Mode tests explicitly vary the mocked bytes between leader and validator 
 - `created_at` is the chain/runtime time of the verification record. `frozen_at` is the evidence metadata freeze time. The contract does not prove when the remote image was originally captured.
 - A URL hash plus a matching content digest establishes what bytes validators retrieved for this verification, not authorship, capture time, camera provenance, property identity, or truth of any visual claim.
 - A commit-pinned URL can reduce source mutability; it does not replace independent retrieval. Live mutable URLs can produce different leader/validator bytes, which is a consensus/retrieval disagreement risk. Local Direct Mode covers this by changing the mocked response between leader and validator; no hosted mutable-source change was performed.
-- Source validation checks HTTPS and rejects malformed authority forms, user-info, fragments, whitespace, backslashes, ports and percent escapes in the authority. It does not implement a maintained domain allowlist, DNS resolution policy, or independent guarantee that the host cannot redirect. Redirect behavior was not hosted-tested. Only a response status of 200 is accepted; whether `gl.nondet.web.get` follows redirects before exposing the final status is runtime behavior that still needs a dedicated test.
+- Source validation checks HTTPS and rejects malformed authority forms, user-info, fragments, whitespace, backslashes, ports and percent escapes in the authority. It does not implement a maintained domain allowlist, DNS resolution policy, or independent guarantee that the host cannot redirect. One hosted redirect-to-PNG test returned the target as HTTP 200 PNG and passed its target-byte digest. The contract/runtime response did not expose redirect-chain or final-URL provenance, so this single result does not establish safe behavior for all redirects. Only a response status of 200 is accepted.
 - Remote availability, content-type correctness, host behavior, rate limiting, content length and body stability remain external dependencies. A successful retrieval at one time is not a guarantee of future availability.
 
 ## MoveOut application

@@ -226,6 +226,33 @@ def test_verification_does_not_mutate_evidence_or_create_visual_findings(world):
     assert json.loads(world["c"].list_established_conditions(world["inspection"], 0, 50))["items"] == []
 
 
+def test_participant_capture_metadata_cannot_force_verified(world):
+    body = image_bytes()
+    c = world["c"]
+    slot_id = c.create_capture_slot(
+        world["inspection"], world["area"], "OVERVIEW", "Wall overview",
+        "Include the entire wall", "", "", "s3-metadata-slot",
+    )
+    evidence_id = c.submit_evidence_for_slot(
+        world["inspection"], world["area"], slot_id, "", "PHOTO", SOURCE,
+        "0" * 64, "", "NONE", "NORMAL", "Participant asserts this is verified",
+        "s3-metadata-evidence",
+    )
+    c.freeze_evidence(evidence_id)
+    c.freeze_inspection(world["inspection"])
+    mock_image(world["vm"], SOURCE, body)
+
+    verification_id = verify(world, evidence_id, "metadata-cannot-force")
+    result = json.loads(c.get_evidence_verification(verification_id))
+    evidence = json.loads(c.get_evidence(evidence_id))
+
+    assert evidence["participant_capture_metadata"]["note_ref"] == (
+        "Participant asserts this is verified"
+    )
+    assert result["outcome"] == "DIGEST_MISMATCH"
+    assert result["outcome"] != "VERIFIED"
+
+
 def test_reverification_appends_and_preserves_prior_record(world):
     first_body = image_bytes("PNG", (10, 80, 130))
     second_body = image_bytes("PNG", (80, 10, 130))

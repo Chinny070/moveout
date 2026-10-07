@@ -5,6 +5,7 @@
 ## Source, runtime, network, and disposable deployment
 
 - Contract source: `contracts/moveout_protocol_v1.py`
+- Stage 2 baseline contract SHA-256: `596318A50FDE982E79EC5BDAF3EE7469D7D9EC5F1E776BB1C665FEE8480FA9AA`
 - Exact source SHA-256 submitted to the StudioNet deployment: `3DAF8D20E82E43B7174BAAEEDA052EEAF7F90F91AA0C8C8EB42BC90C4C2E8624`
 - Pinned GenVM runtime: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
 - Target: StudioNet, chain ID `61999`, RPC `https://studio.genlayer.com/api`
@@ -18,6 +19,8 @@
 The deployed contract schema was read back and included the Stage 3 methods. The deployed contract source hash matched the exact source hash above. The deployment and all hosted proof writes below used the same StudioNet chain; no network switch occurred.
 
 ## APIs and validator workflow exercised
+
+The implementation was cross-checked against GenLayer's current official [Fetch Web Content example](https://docs.genlayer.com/developers/intelligent-contracts/examples/fetch-web-content), [Web Access reference](https://docs.genlayer.com/developers/intelligent-contracts/features/web-access), and [nondeterminism/custom-validator reference](https://docs.genlayer.com/developers/intelligent-contracts/features/non-determinism). The installed CLI bundled GenLayerJS 1.1.8; the deployed source pins the current `py-genlayer` runtime shown above. Lint/SDK validation and hosted 200/404 reads verified the actual runtime fields used by this contract.
 
 - Retrieval API: `gl.nondet.web.get(source_url)`.
 - Runtime response fields consumed: `response.status`, `response.headers`, and `response.body` (`bytes`).
@@ -83,8 +86,9 @@ Run: `scripts/verify_moveout.ps1` (local Direct Mode plus static checks).
 
 | Check | Result |
 |---|---|
-| Complete local suite: `gltest tests -q` | PASS, 171 tests (87.20s) |
-| Stage 3 direct test module: `gltest tests/test_moveout_stage3_provenance.py -q` | PASS, 26 tests (16.57s) |
+| Preserved Stage 2 regression baseline | PASS, all 145 pre-Stage-3 tests remain included |
+| Complete local suite: `gltest tests -q` | PASS, 172 tests (31.31s) |
+| Stage 3 direct test module: `gltest tests/test_moveout_stage3_provenance.py -q` | PASS, 27 tests (6.42s), including participant-metadata non-attestation |
 | `genvm-lint lint contracts/moveout_protocol_v1.py` | PASS, 3 checks |
 | `genvm-lint check contracts/moveout_protocol_v1.py` | PASS, 68 methods (42 view, 26 write) |
 | `python -m compileall -q contracts tests` | PASS |
@@ -110,3 +114,5 @@ Stage 3 Direct Mode coverage includes valid PNG/JPEG, byte digest match/mismatch
 **Stage 3 hosted validator-side byte provenance: VERIFIED for the six recorded cases.**
 
 **MoveOut semantic visual adjudication: NOT VERIFIED by Stage 3.** Stage 3 proves bytes and source-response properties only. Continue to keep provenance verification separate from any later visual observation or condition verdict. Stop here; Stage 4 has not started.
+
+**READY FOR STAGE 4: YES, for the next bounded observation-protocol design gate.** The attached Stage 3 gate's conditions passed: matching PNG/JPEG bytes verified, mismatch/invalid/unavailable cases failed closed, authoritative state was reread, and the 145 pre-Stage-3 regressions remain in the 172-test suite. This is readiness only; Stage 4 has not begun. Redirect destination policy and domain allowlisting remain production-hardening work and are explicitly not proven by this stage.
