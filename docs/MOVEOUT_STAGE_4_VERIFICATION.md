@@ -117,4 +117,4 @@ The earlier incorrect slot attempt used the script's mistaken `CAP-1` label, whi
 - **Blockers:** the six-case single-image hosted gate failed; redirect/final-destination cannot be checked using the current runtime response surface; the pairwise hosted batch was run before the single gate passed and must be rerun in the prescribed order after recovery.
 - **Next action:** harden redirect provenance or restrict to a source mechanism whose final destination can be established; diagnose and improve normalized validator reproducibility without weakening critical-field equivalence; rerun all single-image cases. Only after the single-image gate passes should pairwise hosted cases be repeated.
 
-**Commit/push:** pending final report and source staging. No wallet material or temporary hosted runner is to be committed.
+**Commit/push:** Stage 4 implementation and reports were pushed to `origin/main`; implementation commit `f8481a699916632943bac5ddcf8d848df2908c9a`. No wallet material or temporary hosted runner was committed.
