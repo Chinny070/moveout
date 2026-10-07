@@ -11,16 +11,20 @@ function Invoke-RequiredCheck([string]$Label, [string]$Executable, [string[]]$Ar
     }
 }
 
-Invoke-RequiredCheck 'Complete suite (Stage 1, historical regressions, Stage 2)' 'gltest' @('tests', '-q')
+Invoke-RequiredCheck 'Complete suite (Stage 1, historical regressions, Stages 2–3 direct tests)' 'gltest' @('tests', '-q')
 Invoke-RequiredCheck 'GenVM lint' 'genvm-lint' @('lint', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'GenVM SDK validation' 'genvm-lint' @('check', 'contracts/moveout_protocol_v1.py')
 Invoke-RequiredCheck 'Python syntax compilation' 'python' @('-m', 'compileall', '-q', 'contracts', 'tests')
 
-Write-Host "`n== Determinism and scope scan =="
-$forbidden = 'gl\.nondet|web\.get|web\.render|exec_prompt|run_nondet|MOV-SYN|expected_label|benchmark_manifest'
-& rg -n $forbidden 'contracts/moveout_protocol_v1.py'
-if ($LASTEXITCODE -eq 0) { throw 'Forbidden nondeterministic or benchmark-specific contract reference found' }
-if ($LASTEXITCODE -ne 1) { throw "Source scan failed with exit code $LASTEXITCODE" }
+Write-Host "`n== Stage 3 nondeterministic scope scan =="
+& python 'scripts/check_stage3_scope.py'
+if ($LASTEXITCODE -ne 0) { throw "Stage 3 scope scan failed with exit code $LASTEXITCODE" }
+
+Write-Host "`n== Benchmark-specific production logic scan =="
+$benchmarkSelectors = 'MOV-SYN|expected_label|benchmark_manifest'
+& rg -n $benchmarkSelectors 'contracts/moveout_protocol_v1.py'
+if ($LASTEXITCODE -eq 0) { throw 'Benchmark-specific contract reference found' }
+if ($LASTEXITCODE -ne 1) { throw "Benchmark source scan failed with exit code $LASTEXITCODE" }
 
 $sensitive = '-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----|mnemonic|seed phrase|wallet\.json|api[_-]?key|access[_-]?token|password\s*='
 & rg -n -i -- $sensitive 'contracts/moveout_protocol_v1.py' 'docs/MOVEOUT_STAGE_1_1_HARDENING.md'
@@ -33,4 +37,4 @@ if ($LASTEXITCODE -ne 0) { throw "git diff --check failed with exit code $LASTEX
 & git diff --cached --check
 if ($LASTEXITCODE -ne 0) { throw "git diff --cached --check failed with exit code $LASTEXITCODE" }
 
-Write-Host "`nAll deterministic MoveOut verification checks passed."
+Write-Host "`nAll MoveOut offline verification checks passed."

@@ -1,5 +1,5 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-"""Deterministic MoveOut protocol records. No visual adjudication is performed here."""
+"""MoveOut protocol records with bounded evidence-byte verification; no visual adjudication."""
 
 from genlayer import *
 import hashlib
@@ -57,6 +57,11 @@ class MoveOutProtocolV1(gl.Contract):
     findings_by_inspection: TreeMap[str, str]
     events_by_property: TreeMap[str, str]
 
+    # Stage 3 append-only provenance verification records (no image classification).
+    evidence_verifications: TreeMap[str, str]
+    verification_ids_by_evidence: TreeMap[str, str]
+    latest_verification_by_evidence: TreeMap[str, str]
+
     property_seq: u256
     unit_seq: u256
     tenancy_seq: u256
@@ -70,6 +75,7 @@ class MoveOutProtocolV1(gl.Contract):
     disagreement_seq: u256
     maintenance_seq: u256
     event_seq: u256
+    verification_seq: u256
 
     MAX_TEXT = 240
     MAX_LABEL = 80
@@ -94,6 +100,8 @@ class MoveOutProtocolV1(gl.Contract):
     MAX_MANAGER_HISTORY_PER_PROPERTY = 128
     MAX_HISTORY_PER_PROPERTY = 1024
     MAX_PAGE_SIZE = 50
+    MAX_VERIFICATIONS_PER_EVIDENCE = 64
+    MAX_VERIFICATION_BODY_BYTES = 8 * 1024 * 1024
     ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
     INSPECTION_TYPES = ("MOVE_IN", "PERIODIC", "MAINTENANCE", "MOVE_OUT")
@@ -148,6 +156,7 @@ class MoveOutProtocolV1(gl.Contract):
         self.disagreement_seq = u256(1)
         self.maintenance_seq = u256(1)
         self.event_seq = u256(1)
+        self.verification_seq = u256(1)
 
     def _now(self) -> str:
         return str(gl.message_raw["datetime"])
@@ -164,6 +173,122 @@ class MoveOutProtocolV1(gl.Contract):
         if len(value) > int(maximum) or (not allow_empty and len(value) == 0):
             self._fail("MO_ERR_BOUNDS", field)
         return value
+
+    def _validate_verification_source(self, source_ref: str) -> str:
+        source = self._text(source_ref, u256(self.MAX_SOURCE_REF), "source_ref")
+        if (not source.startswith("https://") or "#" in source or "\\" in source or
+                any(char.isspace() for char in source)):
+            self._fail("MO_ERR_SOURCE", "https_public_url_required")
+        remainder = source[len("https://"):]
+        authority = remainder.split("/", 1)[0].split("?", 1)[0]
+        if (not authority or "." not in authority or "@" in authority or
+                ":" in authority or "%" in authority or authority.startswith(".") or
+                authority.endswith(".")):
+            self._fail("MO_ERR_SOURCE", "https_public_host_required")
+        return source
+
+    def _normalized_content_type(self, headers: dict) -> str:
+        if not isinstance(headers, dict):
+            return ""
+        for key in headers:
+            if isinstance(key, str) and key.lower() == "content-type":
+                value = headers[key]
+                if isinstance(value, bytes):
+                    return value.decode("utf-8", errors="replace").split(";", 1)[0].strip().lower()
+                if isinstance(value, str):
+                    return value.split(";", 1)[0].strip().lower()
+                return ""
+        return ""
+
+    def _verification_result(self, source_hash: str, expected_sha256: str,
+                              outcome: str, failure_code: str = "",
+                              http_status: int = 0, content_type: str = "",
+                              body_size: int = 0, retrieved_sha256: str = "") -> dict:
+        return {
+            "source_ref_sha256": source_hash,
+            "expected_sha256": expected_sha256,
+            "retrieved_sha256": retrieved_sha256,
+            "outcome": outcome,
+            "failure_code": failure_code,
+            "http_status": http_status,
+            "content_type": content_type[:64],
+            "body_size": body_size,
+        }
+
+    def _classify_verification_response(self, status: int, headers: dict,
+                                        body: bytes | None, expected_sha256: str,
+                                        source_hash: str) -> dict:
+        # Only a complete ordinary GET is acceptable; partial/range and redirects
+        # are not treated as a complete original evidence object.
+        if status != 200:
+            return self._verification_result(
+                source_hash, expected_sha256, "UNAVAILABLE", "HTTP_STATUS", status
+            )
+        if body is None or not isinstance(body, bytes) or len(body) == 0:
+            return self._verification_result(
+                source_hash, expected_sha256, "INVALID_CONTENT", "EMPTY_OR_INVALID_BODY", status
+            )
+        size = len(body)
+        if size > int(self.MAX_VERIFICATION_BODY_BYTES):
+            return self._verification_result(
+                source_hash, expected_sha256, "UNSUPPORTED", "BODY_TOO_LARGE",
+                status, self._normalized_content_type(headers), size
+            )
+        mime = self._normalized_content_type(headers)
+        if mime not in ("image/png", "image/jpeg"):
+            if mime.startswith("image/"):
+                return self._verification_result(
+                    source_hash, expected_sha256, "UNSUPPORTED", "UNSUPPORTED_IMAGE_MEDIA_TYPE",
+                    status, mime, size
+                )
+            return self._verification_result(
+                source_hash, expected_sha256, "INVALID_CONTENT", "NON_IMAGE_CONTENT",
+                status, mime, size
+            )
+        if mime == "image/png":
+            png_signature = b"\x89PNG\r\n\x1a\n"
+            png_iend = b"\x00\x00\x00\x00IEND\xaeB`\x82"
+            if (size < 45 or body[:8] != png_signature or
+                    body[8:12] != b"\x00\x00\x00\r" or body[12:16] != b"IHDR" or
+                    body[16:20] == b"\x00" * 4 or body[20:24] == b"\x00" * 4 or
+                    not body.endswith(png_iend)):
+                return self._verification_result(
+                    source_hash, expected_sha256, "INVALID_CONTENT", "PNG_SIGNATURE_OR_STRUCTURE",
+                    status, mime, size
+                )
+        else:
+            if size < 4 or body[:2] != b"\xff\xd8" or not body.endswith(b"\xff\xd9"):
+                return self._verification_result(
+                    source_hash, expected_sha256, "INVALID_CONTENT", "JPEG_SIGNATURE_OR_STRUCTURE",
+                    status, mime, size
+                )
+        retrieved_sha256 = hashlib.sha256(body).hexdigest()
+        if retrieved_sha256 != expected_sha256:
+            return self._verification_result(
+                source_hash, expected_sha256, "DIGEST_MISMATCH", "",
+                status, mime, size, retrieved_sha256
+            )
+        return self._verification_result(
+            source_hash, expected_sha256, "VERIFIED", "",
+            status, mime, size, retrieved_sha256
+        )
+
+    def _retrieve_and_verify_evidence(self, source_ref: str,
+                                      expected_sha256: str) -> dict:
+        source_hash = hashlib.sha256(source_ref.encode("utf-8")).hexdigest()
+        try:
+            response = gl.nondet.web.get(source_ref)
+            status = int(response.status)
+            headers = response.headers
+            body = response.body
+            return self._classify_verification_response(
+                status, headers, body, expected_sha256, source_hash
+            )
+        except Exception:
+            # Do not persist unstable exception text or remote response bodies.
+            return self._verification_result(
+                source_hash, expected_sha256, "UNAVAILABLE", "FETCH_ERROR"
+            )
 
     def _enum(self, value: str, allowed: tuple, field: str) -> str:
         if not isinstance(value, str) or value not in allowed:
@@ -1230,6 +1355,90 @@ class MoveOutProtocolV1(gl.Contract):
         self._append_event(inspection["property_id"], "INSPECTION_FROZEN", "inspection", inspection_id)
 
     @gl.public.write
+    def verify_evidence_provenance(self, tenancy_id: str, evidence_id: str,
+                                   request_id: str) -> str:
+        evidence = self._load(self.evidence_records, evidence_id, "evidence")
+        tenancy = self._require_participant(tenancy_id)
+        if evidence["tenancy_id"] != tenancy_id:
+            self._fail("MO_ERR_WRONG_SCOPE", "evidence_tenancy")
+        inspection = self._load(self.inspections, evidence["inspection_id"], "inspection")
+        if (evidence["property_id"] != tenancy["property_id"] or
+                evidence["unit_id"] != tenancy["unit_id"] or
+                inspection["property_id"] != tenancy["property_id"] or
+                inspection["unit_id"] != tenancy["unit_id"] or
+                inspection["tenancy_id"] != tenancy_id or
+                evidence["property_id"] != inspection["property_id"] or
+                evidence["unit_id"] != inspection["unit_id"]):
+            self._fail("MO_ERR_WRONG_SCOPE", "evidence_parent_binding")
+        if evidence["status"] != "FROZEN" or inspection["status"] != "FROZEN":
+            self._fail("MO_ERR_STATE", "frozen_inspection_evidence_required")
+        if evidence["evidence_type"] != "PHOTO":
+            self._fail("MO_ERR_UNSUPPORTED_EVIDENCE_TYPE", evidence["evidence_type"])
+        expected = evidence.get("expected_sha256", "")
+        if (not isinstance(expected, str) or len(expected) != 64 or
+                any(char not in "0123456789abcdef" for char in expected)):
+            self._fail("MO_ERR_SHA256", "expected_64_lowercase_hex_characters")
+        source = self._validate_verification_source(evidence.get("source_ref", ""))
+        payload = {"tenancy_id": tenancy_id, "evidence_id": evidence_id}
+        replay = self._idempotent_replay(
+            "verify_evidence_provenance", request_id, payload
+        )
+        if replay:
+            return replay
+        verification_ids = json.loads(
+            self.verification_ids_by_evidence.get(evidence_id, "[]")
+        )
+        if len(verification_ids) >= int(self.MAX_VERIFICATIONS_PER_EVIDENCE):
+            self._fail("MO_ERR_BOUNDS", "verifications_per_evidence")
+
+        def leader_fn():
+            return self._retrieve_and_verify_evidence(source, expected)
+
+        def validator_fn(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            proposed = leader_result.calldata
+            if not isinstance(proposed, dict):
+                return False
+            independent = self._retrieve_and_verify_evidence(source, expected)
+            # The validator independently fetches the URL, validates response
+            # metadata/format/size, and hashes the returned original bytes.
+            # Compare this compact normalized result, never the raw body.
+            return proposed == independent
+
+        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        verification_id = self._new_id("EVER", self.verification_seq)
+        self.verification_seq += u256(1)
+        prior_id = self.latest_verification_by_evidence.get(evidence_id, "")
+        record = {
+            "verification_id": verification_id,
+            "evidence_id": evidence_id,
+            "property_id": evidence["property_id"],
+            "unit_id": evidence["unit_id"],
+            "tenancy_id": tenancy_id,
+            "inspection_id": evidence["inspection_id"],
+            "source_ref_sha256": result["source_ref_sha256"],
+            "expected_sha256": result["expected_sha256"],
+            "retrieved_sha256": result["retrieved_sha256"],
+            "outcome": result["outcome"],
+            "failure_code": result["failure_code"],
+            "http_status": result["http_status"],
+            "content_type": result["content_type"],
+            "body_size": result["body_size"],
+            "created_at": self._now(),
+            "previous_verification_id": prior_id,
+        }
+        self.evidence_verifications[verification_id] = self._json(record)
+        self._append(self.verification_ids_by_evidence, evidence_id, verification_id,
+                     u256(self.MAX_VERIFICATIONS_PER_EVIDENCE),
+                     "verifications_per_evidence")
+        self.latest_verification_by_evidence[evidence_id] = verification_id
+        self._append_event(evidence["property_id"], "EVIDENCE_VERIFICATION_RECORDED",
+                           "evidence_verification", verification_id)
+        self._remember("verify_evidence_provenance", request_id, payload, verification_id)
+        return verification_id
+
+    @gl.public.write
     def submit_inspection_review(self, inspection_id: str, review_status: str,
                                  note_ref: str, request_id: str) -> str:
         inspection = self._load(self.inspections, inspection_id, "inspection")
@@ -1505,6 +1714,40 @@ class MoveOutProtocolV1(gl.Contract):
         return self._json(evidence)
 
     @gl.public.view
+    def get_evidence_verification(self, verification_id: str) -> str:
+        return self._json(self._load(
+            self.evidence_verifications, verification_id, "evidence_verification"
+        ))
+
+    @gl.public.view
+    def get_evidence_verification_status(self, evidence_id: str) -> str:
+        self._load(self.evidence_records, evidence_id, "evidence")
+        verification_ids = json.loads(
+            self.verification_ids_by_evidence.get(evidence_id, "[]")
+        )
+        if not verification_ids:
+            return self._json({
+                "evidence_id": evidence_id, "verification_count": 0,
+                "historically_verified": False, "latest_verification_id": "",
+                "latest": {}, "latest_differs_from_first": False,
+            })
+        records = [json.loads(self.evidence_verifications[item])
+                   for item in verification_ids]
+        first = records[0]
+        latest = records[-1]
+        historically_verified = any(record["outcome"] == "VERIFIED" for record in records)
+        changed = (first["outcome"] != latest["outcome"] or
+                   first["retrieved_sha256"] != latest["retrieved_sha256"])
+        return self._json({
+            "evidence_id": evidence_id,
+            "verification_count": len(records),
+            "historically_verified": historically_verified,
+            "latest_verification_id": latest["verification_id"],
+            "latest": latest,
+            "latest_differs_from_first": changed,
+        })
+
+    @gl.public.view
     def get_visual_observation_record(self, observation_id: str) -> str:
         return self._json(self._load(self.visual_observations, observation_id,
                                      "visual_observation"))
@@ -1575,6 +1818,13 @@ class MoveOutProtocolV1(gl.Contract):
     def list_evidence(self, inspection_id: str, offset: u256, limit: u256) -> str:
         return self._page(self.evidence_by_inspection, self.evidence_records,
                           inspection_id, offset, limit)
+
+    @gl.public.view
+    def list_evidence_verifications(self, evidence_id: str,
+                                    offset: u256, limit: u256) -> str:
+        self._load(self.evidence_records, evidence_id, "evidence")
+        return self._page(self.verification_ids_by_evidence,
+                          self.evidence_verifications, evidence_id, offset, limit)
 
     @gl.public.view
     def list_property_history(self, property_id: str, offset: u256, limit: u256) -> str:
