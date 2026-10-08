@@ -387,7 +387,92 @@ class MoveOutProtocolV1(gl.Contract):
         if (normalized.get("text_present") == "NO" and
                 normalized.get("possible_injection_text") == "YES"):
             valid = False
+        if "same_area_support" in normalized:
+            # A change claim is unsafe unless correspondence is supported and
+            # both compared regions are observable without material confounders.
+            material_confounded = any(
+                normalized.get(field) == "YES" for field in (
+                    "viewpoint_confounder", "lighting_confounder",
+                    "occlusion_confounder", "crop_confounder", "scale_confounder",
+                )
+            )
+            if normalized["same_area_support"] != "SUPPORTED":
+                if (normalized.get("visible_difference") == "YES" or
+                        normalized.get("comparison_uncertainty") == "LOW"):
+                    valid = False
+            if material_confounded and (
+                    normalized.get("visible_difference") == "YES" or
+                    normalized.get("comparison_uncertainty") == "LOW"):
+                valid = False
+            feature_a = normalized.get("feature_present_a")
+            feature_b = normalized.get("feature_present_b")
+            if (feature_a in ("YES", "NO") and feature_b in ("YES", "NO") and
+                    feature_a != feature_b and
+                    normalized.get("visible_difference") != "YES"):
+                valid = False
+            if (feature_a == feature_b and feature_a in ("YES", "NO") and
+                    normalized.get("visible_difference") == "YES" and
+                    not material_confounded):
+                valid = False
+            if normalized.get("visible_difference") == "YES" and (
+                    feature_a == "UNCERTAIN" or feature_b == "UNCERTAIN"):
+                valid = False
+        if not valid:
+            # Keep no raw/model-provided detail in persistent state. A bounded
+            # fail-closed observation makes malformed/contradictory outputs
+            # explicit without manufacturing a semantic fact.
+            if "same_area_support" in normalized:
+                normalized = self._empty_pair_observation()
+            elif "area_visibility" in normalized:
+                normalized = self._empty_single_observation()
         return normalized, valid
+
+    def _observation_equivalent(self, leader: dict, validator: dict,
+                                pairwise: bool = False) -> bool:
+        """Conservative field-level equivalence for independently run vision."""
+        if not isinstance(leader, dict) or not isinstance(validator, dict):
+            return False
+        if (leader.get("stage") != "OBSERVATION" or
+                validator.get("stage") != "OBSERVATION" or
+                leader.get("schema_valid") is not True or
+                validator.get("schema_valid") is not True):
+            # Inconclusive/failure outputs include independent fetch diagnostics;
+            # they may agree only when their complete bounded provenance does.
+            return leader == validator
+        provenance_fields = ("evidence_ids", "digests", "verification_ids", "continuity") if pairwise else (
+            "evidence_id", "digest", "verification_id"
+        )
+        for field in provenance_fields:
+            if leader.get(field) != validator.get(field):
+                return False
+        if pairwise:
+            critical_fields = (
+                "same_area_support", "feature_present_a", "feature_present_b",
+                "visible_difference", "comparison_uncertainty",
+            )
+        else:
+            critical_fields = (
+                "area_visibility", "crack_present", "stain_present",
+                "other_mark_present", "surface_damage_present",
+            )
+        leader_obs = leader.get("observations")
+        validator_obs = validator.get("observations")
+        if not isinstance(leader_obs, dict) or not isinstance(validator_obs, dict):
+            return False
+        # Re-run the same semantic checks on both candidates. No malformed or
+        # contradictory result can gain acceptance through a partial match.
+        normalized_leader, leader_valid = self._normalize_observation(
+            leader_obs, self.PAIR_OBSERVATION_FIELDS if pairwise else self.SINGLE_OBSERVATION_FIELDS
+        )
+        normalized_validator, validator_valid = self._normalize_observation(
+            validator_obs, self.PAIR_OBSERVATION_FIELDS if pairwise else self.SINGLE_OBSERVATION_FIELDS
+        )
+        if not leader_valid or not validator_valid:
+            return False
+        if normalized_leader != leader_obs or normalized_validator != validator_obs:
+            return False
+        return all(leader_obs.get(field) == validator_obs.get(field)
+                   for field in critical_fields)
 
     def _prior_verified_evidence(self, evidence: dict) -> dict:
         verification_id = self.latest_verification_by_evidence.get(evidence["evidence_id"], "")
@@ -443,9 +528,16 @@ class MoveOutProtocolV1(gl.Contract):
             "with these enum fields: area_visibility VISIBLE|PARTIAL|NOT_ESTABLISHED|UNCERTAIN; "
             "crack_present YES|NO|UNCERTAIN; stain_present YES|NO|UNCERTAIN; "
             "other_mark_present YES|NO|UNCERTAIN; surface_damage_present YES|NO|UNCERTAIN; "
-            "occlusion_present YES|NO|UNCERTAIN; shadow_present YES|NO|UNCERTAIN; "
+            "occlusion_present YES only when an object or obstruction hides a relevant part "
+            "of the assessed surface; ordinary furniture elsewhere is NO. "
+            "shadow_present YES only for a visible shadow/reflection that materially obscures "
+            "or resembles a defect; ordinary lighting gradients are NO. "
             "low_light_present YES|NO|UNCERTAIN; blur_present YES|NO|UNCERTAIN; "
-            "crop_limitation_present YES|NO|UNCERTAIN; text_present YES|NO|UNCERTAIN; "
+            "crop_limitation_present YES only when framing cuts off or makes the relevant "
+            "surface too small to assess; ordinary camera-angle/framing variation is NO. "
+            "A visible feature flag is YES only when a mark/defect is visibly present, not "
+            "because of a wall edge, perspective, lighting, or an uncertain cue. "
+            "text_present YES|NO|UNCERTAIN; "
             "possible_injection_text YES|NO|UNCERTAIN. No prose or extra keys."
         )
         try:
@@ -1751,7 +1843,7 @@ class MoveOutProtocolV1(gl.Contract):
             independent = self._observe_single(evidence_id, source, expected,
                                                verification["verification_id"])
             proposed = leader_result.calldata
-            return proposed == independent
+            return self._observation_equivalent(proposed, independent)
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
         if (result.get("stage") == "OBSERVATION" and
@@ -1804,7 +1896,8 @@ class MoveOutProtocolV1(gl.Contract):
                 evidence_id_a, evidence_id_b, source_a, expected_a, verify_a["verification_id"],
                 source_b, expected_b, verify_b["verification_id"], continuity,
             )
-            return leader_result.calldata == independent
+            return self._observation_equivalent(leader_result.calldata, independent,
+                                                pairwise=True)
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
         if (result.get("stage") == "OBSERVATION" and

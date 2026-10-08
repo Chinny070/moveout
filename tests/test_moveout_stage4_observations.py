@@ -151,8 +151,8 @@ def test_pair_observation_retrieves_and_binds_both_digests(world):
     assert world["vm"].run_validator() is True
     record = json.loads(world["c"].get_visual_observation_record(observation_id))
     assert record["source_digests"] == [before["expected_sha256"], after["expected_sha256"]]
-    assert record["observations"]["visible_difference"] == "YES"
-    assert record["status"] == "OBSERVED"
+    assert record["observations"]["visible_difference"] == "UNCERTAIN"
+    assert record["status"] == "INCONCLUSIVE"
     assert json.loads(world["c"].list_established_conditions(world["inspection"], 0, 50))["items"] == []
 
 
@@ -375,6 +375,117 @@ def test_pair_equivalence_rejects_different_visual_interpretations(world):
                          json.dumps(pair_result(visible_difference="YES")))
     assert world["vm"].run_validator() is False
     assert observation_id
+
+
+@pytest.mark.parametrize("updates", [
+    {"same_area_support": "NOT_SUPPORTED", "visible_difference": "YES",
+     "comparison_uncertainty": "LOW"},
+    {"same_area_support": "UNCERTAIN", "visible_difference": "NO",
+     "comparison_uncertainty": "LOW"},
+    {"crop_confounder": "YES", "visible_difference": "YES",
+     "comparison_uncertainty": "LOW"},
+    {"viewpoint_confounder": "YES", "visible_difference": "NO",
+     "comparison_uncertainty": "LOW"},
+    {"lighting_confounder": "YES", "comparison_uncertainty": "LOW"},
+    {"occlusion_confounder": "YES", "comparison_uncertainty": "LOW"},
+    {"scale_confounder": "YES", "comparison_uncertainty": "LOW"},
+    {"feature_present_a": "YES", "feature_present_b": "NO",
+     "visible_difference": "NO"},
+    {"feature_present_a": "YES", "feature_present_b": "YES",
+     "visible_difference": "YES"},
+    {"feature_present_a": "UNCERTAIN", "feature_present_b": "NO",
+     "visible_difference": "YES"},
+])
+def test_contradictory_or_overconfident_pair_observations_fail_closed(world, updates):
+    normalized, valid = world["c"]._normalize_observation(
+        pair_result(**updates), world["c"].PAIR_OBSERVATION_FIELDS
+    )
+    assert valid is False
+    assert normalized == world["c"]._empty_pair_observation()
+
+
+def test_pair_field_equivalence_allows_secondary_flag_difference_but_keeps_critical_exact(world):
+    contract = world["c"]
+    leader = {"stage": "OBSERVATION", "failure_code": "", "evidence_ids": [world["a"], world["b"]],
+              "digests": ["a" * 64, "b" * 64], "verification_ids": ["va", "vb"],
+              "continuity": "NONE", "schema_valid": True,
+              "observations": pair_result(viewpoint_confounder="NO")}
+    validator = json.loads(json.dumps(leader))
+    validator["observations"]["viewpoint_confounder"] = "UNCERTAIN"
+    assert contract._observation_equivalent(leader, validator, pairwise=True) is True
+    validator["observations"]["visible_difference"] = "YES"
+    assert contract._observation_equivalent(leader, validator, pairwise=True) is False
+
+
+def test_single_field_equivalence_rejects_critical_feature_disagreement(world):
+    contract = world["c"]
+    leader = {"stage": "OBSERVATION", "failure_code": "", "evidence_id": world["a"],
+              "digest": "a" * 64, "verification_id": "va", "schema_valid": True,
+              "observations": single_result()}
+    validator = json.loads(json.dumps(leader))
+    validator["observations"]["occlusion_present"] = "UNCERTAIN"
+    assert contract._observation_equivalent(leader, validator) is True
+    validator["observations"]["crack_present"] = "NO"
+    assert contract._observation_equivalent(leader, validator) is False
+
+
+def test_ambiguous_mark_remains_explicitly_uncertain(world):
+    verify(world, world["a"], URL_A, world["body_a"], "ambiguous-mark")
+    world["vm"].run_validator()
+    answer = single_result(crack_present="UNCERTAIN", other_mark_present="UNCERTAIN")
+    observation_id = observe_single(world, answer=answer)
+    assert world["vm"].run_validator() is True
+    record = json.loads(world["c"].get_visual_observation_record(observation_id))
+    assert record["status"] == "OBSERVED"
+    assert record["observations"]["crack_present"] == "UNCERTAIN"
+    assert json.loads(world["c"].list_established_conditions(world["inspection"], 0, 50))["items"] == []
+
+
+def test_observation_validator_rejects_independent_digest_mismatch(world):
+    verify(world, world["a"], URL_A, world["body_a"], "equivalence-digest")
+    world["vm"].run_validator()
+    observation_id = observe_single(world)
+    world["vm"].clear_mocks()
+    changed = image_bytes(color=(3, 4, 5))
+    mock_image(world["vm"], URL_A, changed)
+    world["vm"].mock_llm(r"Describe only bounded visible features", json.dumps(single_result()))
+    assert world["vm"].run_validator() is False
+    assert observation_id
+
+
+def test_observation_url_policy_rejects_redirect_responses_and_discloses_hidden_redirect_limit(world):
+    assert world["c"]._validate_visual_source(URL_A) == URL_A
+    response = world["c"]._classify_verification_response(
+        302, {"content-type": "image/png", "location": "https://example.org/image.png"},
+        world["body_a"], hashlib.sha256(world["body_a"]).hexdigest(),
+        hashlib.sha256(URL_A.encode()).hexdigest(),
+    )
+    assert response["outcome"] != "VERIFIED"
+    # Runtime response has no final-URL field. Hidden auto-follow cannot be
+    # distinguished here, so only known redirect responses are rejectable.
+    assert "final_url" not in response
+
+
+def test_clean_image_negative_confonder_schema_does_not_infer_edge_as_occlusion(world):
+    normalized, valid = world["c"]._normalize_observation(
+        single_result(crack_present="NO", occlusion_present="NO", shadow_present="NO",
+                      crop_limitation_present="NO"), world["c"].SINGLE_OBSERVATION_FIELDS
+    )
+    assert valid is True
+    assert normalized["occlusion_present"] == "NO"
+    assert normalized["shadow_present"] == "NO"
+    assert normalized["crop_limitation_present"] == "NO"
+
+
+def test_observation_only_storage_does_not_create_established_condition(world):
+    verify(world, world["a"], URL_A, world["body_a"], "observation-only")
+    world["vm"].run_validator()
+    observation_id = observe_single(world)
+    assert world["vm"].run_validator() is True
+    assert json.loads(world["c"].get_visual_observation_record(observation_id))["kind"] == "SINGLE_IMAGE"
+    assert json.loads(world["c"].list_established_conditions(world["inspection"], 0, 50))["items"] == []
+    manifest = json.loads(world["c"].get_inspection_manifest(world["inspection"]))
+    assert manifest["live_membership"]["condition_record_ids"] == []
 
 
 def test_observations_are_idempotent_append_only_and_paginated(world):
