@@ -9,14 +9,17 @@ ALLOWED_CALLS = [
     ("gl.nondet.web.get", "_retrieve_and_verify_evidence"),
     ("gl.nondet.web.get", "_observe_single"),
     ("gl.nondet.web.get", "_observe_target_single"),
+    ("gl.nondet.web.get", "_evaluate_continuity_pair"),
     ("gl.nondet.web.get", "get_checked"),
     ("gl.nondet.exec_prompt", "_observe_single"),
     ("gl.nondet.exec_prompt", "_observe_pair"),
     ("gl.nondet.exec_prompt", "_observe_target_single"),
+    ("gl.nondet.exec_prompt", "_evaluate_continuity_pair"),
     ("gl.vm.run_nondet_unsafe", "verify_evidence_provenance"),
     ("gl.vm.run_nondet_unsafe", "observe_evidence"),
     ("gl.vm.run_nondet_unsafe", "observe_evidence_pair"),
     ("gl.vm.run_nondet_unsafe", "observe_nominated_target"),
+    ("gl.vm.run_nondet_unsafe", "assess_supplemental_continuity"),
 ]
 
 
@@ -69,7 +72,7 @@ def main():
         errors.append(f"visual observation/finding public writers found: {visitor.forbidden_writers!r}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print("Stage 4–5.2 scope passed: bounded target retrieval/vision/custom validator; no finding writer")
+    print("Stage 4–5.3 scope passed: bounded target/continuity retrieval, vision, and validator; no finding writer")
 
 
 if __name__ == "__main__":
