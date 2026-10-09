@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f0">
+  <title>MoveOut — Property inspection demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="MoveOut home">
+      <span class="brand-mark" aria-hidden="true">M</span>
+      <span>moveout<span class="brand-period">.</span></span>
+    </a>
+    <div class="demo-pill"><span></span> DEMO MODE <span class="pill-note">Local only · Not on-chain</span></div>
+    <button class="button button-quiet top-new" id="top-new" type="button">＋ New inspection</button>
+  </header>
+
+  <main id="app" class="shell">
+    <section id="home-view" class="view">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">PROPERTY RECORDS, MADE CLEAR</p>
+          <h1>Keep a clear record<br>of every room.</h1>
+          <p class="hero-text">Create an inspection, note visible conditions, and keep the photographs together. Your demo records stay in this browser.</p>
+          <button class="button button-dark" id="start-inspection" type="button">Start an inspection <span aria-hidden="true">→</span></button>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-sun"></div>
+          <div class="art-window"><i></i><i></i><i></i><i></i></div>
+          <div class="art-wall"></div><div class="art-floor"></div>
+          <div class="art-plant"><i></i><i></i><i></i><b></b></div>
+          <div class="art-card"><span class="tiny-check">✓</span><span><b>Inspection ready</b><small>Every detail in one place</small></span></div>
+        </div>
+      </div>
+      <div class="section-heading">
+        <div><p class="eyebrow">YOUR WORKSPACE</p><h2>Recent inspections</h2></div>
+        <span class="count-label" id="inspection-count">0 inspections</span>
+      </div>
+      <div id="inspection-list" class="inspection-list"></div>
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">⌂</div><h3>Your first inspection starts here</h3>
+        <p>Set up a property and add rooms. Your notes and photos will stay together in this browser.</p>
+        <button class="button button-outline" id="empty-new" type="button">Create an inspection</button>
+      </div>
+      <aside class="notice"><span class="notice-icon">i</span><p><strong>Demo Mode.</strong> Records and photos are saved locally in this browser. They are not sent to GenLayer, stored on-chain, assessed by AI, or shared with anyone.</p></aside>
+    </section>
+
+    <section id="inspection-view" class="view hidden" aria-live="polite">
+      <button class="back-link" id="back-home" type="button">← All inspections</button>
+      <div class="inspection-header">
+        <div><p class="eyebrow">LOCAL DEMO INSPECTION</p><h1 id="inspection-title">Inspection</h1><p class="muted" id="inspection-subtitle"></p></div>
+        <div class="header-actions"><span id="status-badge" class="status-badge">IN PROGRESS</span><button id="complete-inspection" class="button button-outline" type="button">Mark review complete</button></div>
+      </div>
+      <div class="progress-strip"><div><strong id="area-total">0</strong><span>areas</span></div><div><strong id="condition-total">0</strong><span>condition notes</span></div><div><strong id="photo-total">0</strong><span>photos</span></div></div>
+      <div class="work-grid">
+        <aside class="area-panel">
+          <div class="panel-title"><h2>Inspection areas</h2><button id="add-area" class="icon-button" type="button" aria-label="Add area">＋</button></div>
+          <div id="area-list" class="area-list"></div>
+          <form id="area-form" class="inline-form hidden">
+            <label for="area-name">Area name</label><input id="area-name" maxlength="60" placeholder="e.g. Living room" required>
+            <div class="form-actions"><button type="button" class="text-button" id="cancel-area">Cancel</button><button class="button button-dark button-small" type="submit">Add area</button></div>
+          </form>
+          <p class="helper">Add each room or inspection area you want to document.</p>
+        </aside>
+        <section id="area-detail" class="area-detail">
+          <div class="area-placeholder"><div class="empty-icon">＋</div><h3>Add an area to begin</h3><p>Start with a room, hallway, or outdoor area.</p><button class="button button-outline" id="first-area" type="button">Add first area</button></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="new-inspection-dialog" class="dialog">
+    <form id="inspection-form" method="dialog">
+      <div class="dialog-top"><div><p class="eyebrow">NEW RECORD</p><h2>Start an inspection</h2></div><button class="icon-button" type="button" id="close-dialog" aria-label="Close">×</button></div>
+      <label for="property-name">Property name or label <span class="optional">Optional</span></label>
+      <input id="property-name" maxlength="80" placeholder="e.g. Maple Street apartment">
+      <label for="unit-name">Unit or address label <span class="optional">Optional</span></label>
+      <input id="unit-name" maxlength="100" placeholder="e.g. Unit 4B">
+      <p class="privacy-hint">Use labels only. This demo stores data in your browser and does not encrypt it.</p>
+      <div class="dialog-actions"><button class="button button-quiet" type="button" id="cancel-dialog">Cancel</button><button class="button button-dark" type="submit">Create inspection <span aria-hidden="true">→</span></button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer><span>MoveOut</span><span>Demo Mode · Local browser data · No blockchain or AI activity</span></footer>
+</body>
+</html>
