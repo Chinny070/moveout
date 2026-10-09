@@ -10,7 +10,7 @@ This repository did not have a web frontend. The current MVP is a lightweight, s
 - Attach and preview photographs per area.
 - Review counts, records, status, and prior inspections from the history screen.
 - Mark a review complete or reopen it.
-- Remove a note, photo, area, or inspection from this browser.
+- Remove a note, photograph, or area from an inspection.
 - Refresh the page and return to locally saved records.
 
 Notes are user-entered. The app does not assess property condition with AI and does not make legal, liability, deposit, or deduction decisions.
@@ -20,10 +20,10 @@ Notes are user-entered. The app does not assess property condition with AI and d
 From the project root in PowerShell, run:
 
 ```powershell
-python -m http.server 5173 --bind 127.0.0.1
+python -m http.server 54321 --bind 127.0.0.1
 ```
 
-Then open <http://127.0.0.1:5173> in a current desktop or mobile browser. Stop the server with `Ctrl+C`.
+Then open <http://127.0.0.1:54321> in a current desktop or mobile browser. Stop the server with `Ctrl+C`.
 
 No package installation or build step is required. The app consists of `index.html`, `styles.css`, and `app.js`.
 
@@ -33,6 +33,7 @@ No package installation or build step is required. The app consists of `index.ht
 - Inspection metadata, condition notes, and photo blobs are stored in the current browser profile using IndexedDB. Refresh persistence is supported. Clearing browser site data, using another browser/profile/device, or browser storage eviction can remove the records. This is not a server backup or a durable evidence archive.
 - Photos are not uploaded to an AI provider, MoveOut server, or blockchain by this app. The static app makes no third-party font, analytics, or model requests. Browser/network tooling may still fetch the app itself from the local HTTP server.
 - Browser-local records are not encrypted by MoveOut. Use demonstration data only; do not enter sensitive personal information or use a shared browser profile for private evidence.
+- The demo has no per-inspection delete or data export/import control. Clearing site storage deletes all local demo records and photos.
 - Accepted photo formats are JPEG, PNG, WebP, and HEIC/HEIF where the browser supports previewing them; the per-file upload limit is 15 MB. Actual preview format support depends on the browser.
 
 ## Verify the complete workflow
@@ -45,7 +46,7 @@ No package installation or build step is required. The app consists of `index.ht
 6. Attach a small JPG or PNG. Confirm the thumbnail and timestamp appear. Try another room to confirm evidence is area-scoped.
 7. Return to **All inspections** and confirm the record, status, area, and photo counts appear. Reopen it and review the notes/photo.
 8. Refresh the browser. Confirm the inspection and its photo remain available in that same browser profile.
-9. Optionally mark the review complete, reopen it, and remove demo records when finished.
+9. Optionally mark the review complete or reopen it. To remove all local demo data, clear this site's browser storage; this removes every MoveOut demo inspection in that browser profile.
 
 Do not interpret a local demo record as a frozen, verified, or on-chain evidence record.
 
@@ -69,4 +70,4 @@ A production release needs a separately authorized and reviewed integration to d
 - Browser smoke workflow: application load **PASS**; inspection creation **PASS**; area creation **PASS**; manual condition entry **PASS**; history listing/reopen **PASS**; reload and IndexedDB record/condition persistence **PASS**; review-complete status transition **PASS**.
 - Browser photo file selection and preview: **NOT VERIFIED**. The in-app browser automation did not expose a usable native file chooser. The file input/preview/storage code is present, but photo attachment is not counted as an E2E pass. Use the manual workflow above with a small JPG or PNG; then refresh and check that the preview remains.
 - Complete browser E2E: **PARTIAL**, due to the photo-picker limitation. No GenLayer, AI, network, or production behavior was exercised.
-- One local test record (“MVP Demo Property”) was created during the browser smoke test and remains in the local in-app browser profile as a demonstration record. It contains no photograph or personal data. The user can remove it using the app's normal delete flow.
+- One local test record (“MVP Demo Property”) was created during the browser smoke test and remains in the local in-app browser profile as a demonstration record. It contains no photograph or personal data. There is no per-inspection delete control; clearing site data deletes all demo records.
