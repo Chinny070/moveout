@@ -1,4 +1,4 @@
-"""Guard the narrow Stage 4 nondeterministic scope in the MoveOut contract."""
+"""Guard the reviewed Stage 4–5.2 nondeterministic scope in MoveOut."""
 
 import ast
 from pathlib import Path
@@ -8,12 +8,15 @@ CONTRACT = Path("contracts/moveout_protocol_v1.py")
 ALLOWED_CALLS = [
     ("gl.nondet.web.get", "_retrieve_and_verify_evidence"),
     ("gl.nondet.web.get", "_observe_single"),
+    ("gl.nondet.web.get", "_observe_target_single"),
     ("gl.nondet.web.get", "get_checked"),
     ("gl.nondet.exec_prompt", "_observe_single"),
     ("gl.nondet.exec_prompt", "_observe_pair"),
+    ("gl.nondet.exec_prompt", "_observe_target_single"),
     ("gl.vm.run_nondet_unsafe", "verify_evidence_provenance"),
     ("gl.vm.run_nondet_unsafe", "observe_evidence"),
     ("gl.vm.run_nondet_unsafe", "observe_evidence_pair"),
+    ("gl.vm.run_nondet_unsafe", "observe_nominated_target"),
 ]
 
 
@@ -66,7 +69,7 @@ def main():
         errors.append(f"visual observation/finding public writers found: {visitor.forbidden_writers!r}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print("Stage 4 scope passed: bounded retrieval/vision/custom validators; no finding writer")
+    print("Stage 4–5.2 scope passed: bounded target retrieval/vision/custom validator; no finding writer")
 
 
 if __name__ == "__main__":
