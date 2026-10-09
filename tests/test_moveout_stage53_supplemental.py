@@ -18,6 +18,8 @@ URL_A = ("https://raw.githubusercontent.com/Chinny070/moveout/" +
          ASSET_COMMIT + "/benchmarks/a.png")
 URL_B = ("https://raw.githubusercontent.com/Chinny070/moveout/" +
          ASSET_COMMIT + "/benchmarks/b.png")
+URL_C = ("https://raw.githubusercontent.com/Chinny070/moveout/" +
+         ASSET_COMMIT + "/benchmarks/c.png")
 
 
 def addr(value):
@@ -486,6 +488,45 @@ def test_conflicting_repeated_continuity_is_retained_as_conflicted(continuity_wo
     assert second["continuity_basis"] == "CONTRADICTORY_CUES"
     assert first["continuity_assessment_id"] in second["conflict_assessment_ids"]
     assert second["observations"]["feature_presence"] == "UNCERTAIN"
+
+
+def test_contradictory_photos_under_one_request_remain_conflicted(continuity_world):
+    w = continuity_world
+    first = assess(w)
+    assert first["observations"]["feature_presence"] == "ABSENT"
+    second_bytes = png((15, 170, 60))
+    second_digest = hashlib.sha256(second_bytes).hexdigest()
+    second_inspection = w["contract"].create_supplemental_inspection(
+        w["request"], "s53-conflicting-photo-inspection"
+    )
+    second_evidence = w["contract"].submit_supplemental_evidence(
+        w["request"], second_inspection, URL_C, second_digest, "", "UNKNOWN", "UNKNOWN", "",
+        "s53-conflicting-photo-evidence",
+    )
+    w["contract"].freeze_evidence(second_evidence)
+    w["contract"].freeze_inspection(second_inspection)
+    w["vm"].clear_mocks()
+    mock_bytes(w["vm"], URL_C, second_bytes)
+    verification_id = w["contract"].verify_evidence_provenance(
+        w["tenancy"], second_evidence, "s53-conflicting-photo-verify"
+    )
+    assert verification_id
+    assert w["vm"].run_validator() is True
+    w["vm"].clear_mocks()
+    mock_bytes(w["vm"], URL_A, w["original_bytes"])
+    mock_bytes(w["vm"], URL_C, second_bytes)
+    w["vm"].mock_llm(r"Compare image A", json.dumps(
+        continuity_answer(feature_presence="PRESENT")
+    ))
+    second_id = w["contract"].assess_supplemental_continuity(
+        w["request"], second_evidence, "s53-conflicting-photo-assessment"
+    )
+    assert w["vm"].run_validator() is True
+    second = json.loads(w["contract"].get_continuity_assessment(second_id))
+    assert second["assessment_status"] == "CONFLICTED"
+    assert second["target_continuity"] == "SUPPORTED"
+    assert second["observations"]["feature_presence"] == "UNCERTAIN"
+    assert first["continuity_assessment_id"] in second["conflict_assessment_ids"]
 
 
 def test_wrong_target_request_cannot_be_used_for_another_request_evidence(continuity_world):

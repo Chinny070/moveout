@@ -2280,13 +2280,42 @@ class MoveOutProtocolV1(gl.Contract):
         conflicts = []
         prior_ids = json.loads(self.continuity_assessment_ids_by_request.get(
             supplemental_request_id, "[]"))
+        pinned_conflicts = result.get("conflict_assessment_ids", [])
         for prior_id in prior_ids:
             prior = json.loads(self.continuity_assessments[prior_id])
-            if prior.get("supplemental_evidence_id") != supplemental_evidence_id:
+            # Direct Mode can replay the validator callback after the leader's
+            # state write. Ignore only an exact current-result copy at the end
+            # of the index; ordinary chain execution validates against pre-state.
+            if (prior_id == prior_ids[-1] and
+                    prior.get("supplemental_evidence_id") == supplemental_evidence_id and
+                    prior.get("supplemental_request_digest") ==
+                    result.get("supplemental_request_digest") and
+                    prior.get("original_evidence_id") == result.get("original_evidence_id") and
+                    prior.get("original_digest") == result.get("original_digest") and
+                    prior.get("supplemental_digest") == result.get("supplemental_digest") and
+                    prior.get("target_continuity") == result.get("target_continuity") and
+                    prior.get("continuity_basis") == result.get("continuity_basis") and
+                    prior.get("observations") == result.get("observations")):
                 continue
-            if (prior.get("assessment_status") == "CONFLICTED" or
-                    any(prior.get(field) != result.get(field) for field in (
-                        "target_continuity", "continuity_basis", "observations"))):
+            same_photo = prior.get("supplemental_evidence_id") == supplemental_evidence_id
+            prior_presence = prior.get("observations", {}).get("feature_presence")
+            current_presence = result.get("observations", {}).get("feature_presence")
+            opposite_features = {prior_presence, current_presence} == {"PRESENT", "ABSENT"}
+            continuity_conflict = (
+                prior.get("target_continuity") != result.get("target_continuity") or
+                (same_photo and prior.get("continuity_basis") != result.get("continuity_basis"))
+            )
+            cross_photo_conflict = (
+                not same_photo and prior.get("target_continuity") == "SUPPORTED" and
+                result.get("target_continuity") == "SUPPORTED" and opposite_features
+            )
+            same_photo_conflict = same_photo and (
+                prior.get("assessment_status") == "CONFLICTED" or
+                any(prior.get(field) != result.get(field) for field in (
+                    "target_continuity", "continuity_basis", "observations"))
+            )
+            if (prior_id in pinned_conflicts or prior.get("assessment_status") == "CONFLICTED" or
+                    continuity_conflict or cross_photo_conflict or same_photo_conflict):
                 conflicts.append(prior_id)
         if conflicts:
             status = "CONFLICTED"
@@ -2398,8 +2427,17 @@ class MoveOutProtocolV1(gl.Contract):
             result, request["supplemental_request_id"], supplemental["evidence_id"]
         )
         if conflicts:
-            result["target_continuity"] = "UNCERTAIN"
-            result["continuity_basis"] = "CONTRADICTORY_CUES"
+            result["conflict_assessment_ids"] = conflicts
+            continuity_conflict = False
+            for prior_id in conflicts:
+                prior = json.loads(self.continuity_assessments[prior_id])
+                if (prior.get("target_continuity") != result["target_continuity"] or
+                        (prior.get("supplemental_evidence_id") == supplemental["evidence_id"] and
+                         prior.get("continuity_basis") != result["continuity_basis"])):
+                    continuity_conflict = True
+            if continuity_conflict:
+                result["target_continuity"] = "UNCERTAIN"
+                result["continuity_basis"] = "CONTRADICTORY_CUES"
             result["observations"]["feature_presence"] = "UNCERTAIN"
             status, reasons, conflicts = self._continuity_summary(
                 result, request["supplemental_request_id"], supplemental["evidence_id"]

@@ -61,11 +61,12 @@ The leader and each validator callback independently retrieve the original and s
 - `NOT_SUPPORTED` or `UNCERTAIN` continuity forces effective `feature_presence=UNCERTAIN`; no absence is established from an unlinked close-up.
 - Unlocated, obstructed, cropped, unclear, uncertain, and malformed observations cannot support an absence result.
 - Repeated evaluations of the same frozen pair that disagree are appended as `CONFLICTED`, with uncertain continuity and feature status; the earlier result remains available.
+- Different supplemental photos under one request are also checked against earlier assessments. Opposing `PRESENT`/`ABSENT` observations for pairs each classified as continuity `SUPPORTED` produce `CONFLICTED` and an effective `feature_presence=UNCERTAIN`; contradictory continuity classifications also remain unresolved. Earlier assessment records are never removed.
 - Failed retrieval, digest mismatch, or malformed model output fails with `MO_ERR_INCONCLUSIVE` and writes no continuity assessment.
 - Target continuity is an observation only. No “best image wins” aggregate or Established Condition promotion is introduced.
 - Legacy inspection/evidence/V1 and Stage 5.2 target-aware records are not rewritten. No historical migration is required at the source/storage-schema level; an existing deployed instance was not upgraded.
 
-An important limit remains: each supplemental pair is assessed and indexed independently. The contract does not infer from a single supported pair that every additional photograph submitted under the request is consistent, nor does it aggregate separate photos into one final defect verdict. Clients must present the append-only observations and unresolved/conflicted state without selecting a preferred image. Cross-photo product aggregation and adversarial/model-accuracy evaluation belong to separately authorized Stage 5.4.
+An important limit remains: each supplemental pair is assessed and indexed independently, and the contract does not aggregate separate photos into one final defect verdict. It marks directly contradictory supported feature observations as `CONFLICTED`; it does not infer damage changes, cause, or liability. Clients must present the append-only observations and unresolved/conflicted state without selecting a preferred image. Broader cross-photo product aggregation and adversarial/model-accuracy evaluation belong to separately authorized Stage 5.4.
 
 ## Files changed
 
@@ -78,7 +79,7 @@ The Direct Mode tests use mocked responses/interpretations only. They verify det
 
 ## Validation and known limitations
 
-The Stage 5.3 test file completed with **57 passed**. The full repository suite completed with **375 passed, 0 failed**. GenVM lint, SDK validation, Python syntax, nondeterministic-scope scan, benchmark/security scan, and whitespace checks all passed. The SDK reported 84 methods (49 view, 35 write).
+The Stage 5.3 test file completed with **58 passed**. The full repository suite completed with **376 passed, 0 failed**. GenVM lint, SDK validation, Python syntax, nondeterministic-scope scan, benchmark/security scan, and whitespace checks all passed. The SDK reported 84 methods (49 view, 35 write).
 
 No StudioNet transaction was submitted. Hosted compatibility, independent live retrieval by the committee, quorum/finality, transaction receipts, and authoritative rereads are unverified. No visual-model accuracy rate is claimed. URL/digest equality binds retrieved bytes to the submitter-asserted hash; it does not establish camera capture, time, location, or target authenticity. Majority acceptance may conceal minority disagreement under the approved Stage 4.7 policy.
 
