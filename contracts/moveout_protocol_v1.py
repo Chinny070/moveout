@@ -17,6 +17,7 @@ class MoveOutProtocolV1(gl.Contract):
     condition_records: TreeMap[str, str]
     evidence_records: TreeMap[str, str]
     capture_slots: TreeMap[str, str]
+    target_nominations: TreeMap[str, str]
     inspection_reviews: TreeMap[str, str]
     disagreements: TreeMap[str, str]
     maintenance_events: TreeMap[str, str]
@@ -47,6 +48,10 @@ class MoveOutProtocolV1(gl.Contract):
     evidence_by_inspection: TreeMap[str, str]
     capture_slots_by_inspection: TreeMap[str, str]
     evidence_by_capture_slot: TreeMap[str, str]
+    target_nominations_by_inspection: TreeMap[str, str]
+    target_nominations_by_inspection_area: TreeMap[str, str]
+    target_latest_by_identity: TreeMap[str, str]
+    target_superseded_by: TreeMap[str, str]
     rooms_by_inspection: TreeMap[str, str]
     areas_by_inspection: TreeMap[str, str]
     reviews_by_inspection: TreeMap[str, str]
@@ -72,6 +77,7 @@ class MoveOutProtocolV1(gl.Contract):
     condition_seq: u256
     evidence_seq: u256
     capture_slot_seq: u256
+    target_nomination_seq: u256
     review_seq: u256
     disagreement_seq: u256
     maintenance_seq: u256
@@ -82,6 +88,7 @@ class MoveOutProtocolV1(gl.Contract):
     MAX_TEXT = 240
     MAX_LABEL = 80
     MAX_REQUEST_ID = 64
+    MAX_TARGET_IDENTIFIER = 64
     MAX_SOURCE_REF = 512
     MAX_UNITS_PER_PROPERTY = 64
     MAX_TENANCIES_PER_PROPERTY = 64
@@ -93,6 +100,8 @@ class MoveOutProtocolV1(gl.Contract):
     MAX_ROOMS_PER_INSPECTION = 64
     MAX_AREAS_PER_INSPECTION = 256
     MAX_CAPTURE_SLOTS_PER_INSPECTION = 64
+    MAX_TARGET_NOMINATIONS_PER_INSPECTION = 64
+    MAX_TARGET_NOMINATIONS_PER_AREA = 32
     MAX_REVIEWS_PER_INSPECTION = 64
     MAX_REVIEW_REVISIONS_PER_ACTOR = 8
     MAX_DISAGREEMENTS_PER_INSPECTION = 64
@@ -107,6 +116,8 @@ class MoveOutProtocolV1(gl.Contract):
     MAX_OBSERVATIONS_PER_EVIDENCE = 64
     MAX_OBSERVATION_TEXT = 160
     MAX_VERIFICATION_BODY_BYTES = 8 * 1024 * 1024
+    TARGET_NOMINATION_SCHEMA_VERSION = 1
+    TARGET_REGION_COORDINATE_MAX = 10000
     ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
     # Stage 4 V1 policy: commit-pinned public image assets from the controlled
@@ -198,6 +209,7 @@ class MoveOutProtocolV1(gl.Contract):
         self.condition_seq = u256(1)
         self.evidence_seq = u256(1)
         self.capture_slot_seq = u256(1)
+        self.target_nomination_seq = u256(1)
         self.review_seq = u256(1)
         self.disagreement_seq = u256(1)
         self.maintenance_seq = u256(1)
@@ -638,6 +650,98 @@ class MoveOutProtocolV1(gl.Contract):
     def _json(self, record: dict) -> str:
         return json.dumps(record, sort_keys=True, separators=(",", ":"))
 
+    def _target_region_box(self, encoded: str):
+        if not isinstance(encoded, str):
+            self._fail("MO_ERR_SCHEMA", "target_region_box_json")
+        if not encoded:
+            return None
+        self._text(encoded, u256(128), "target_region_box_json")
+        try:
+            coordinates = json.loads(encoded)
+        except Exception:
+            self._fail("MO_ERR_SCHEMA", "target_region_box_json")
+        keys = ("x_min", "y_min", "x_max", "y_max")
+        # The API encoding is a four-item JSON tuple in fixed order. This
+        # avoids duplicate JSON object keys and ambiguous field encodings.
+        if not isinstance(coordinates, list) or len(coordinates) != 4:
+            self._fail("MO_ERR_SCHEMA", "target_region_box_fields")
+        values = coordinates
+        if any(not isinstance(value, int) or isinstance(value, bool) or
+               value < 0 or value > self.TARGET_REGION_COORDINATE_MAX
+               for value in values):
+            self._fail("MO_ERR_BOUNDS", "target_region_box_coordinate")
+        box = {key: coordinates[position] for position, key in enumerate(keys)}
+        if box["x_min"] >= box["x_max"] or box["y_min"] >= box["y_max"]:
+            self._fail("MO_ERR_SCHEMA", "target_region_box_order")
+        return {key: box[key] for key in keys}
+
+    def _target_identity_key(self, inspection_id: str, area_item_id: str,
+                             target_identifier: str) -> str:
+        # Canonical JSON tuple avoids ambiguous delimiter concatenation.
+        return self._json([inspection_id, area_item_id, target_identifier])
+
+    def _target_nomination_digest(self, record: dict) -> str:
+        fields = (
+            "digest_domain", "schema_version", "target_id", "target_version",
+            "target_identifier", "target_description", "inspection_id", "property_id",
+            "unit_id", "tenancy_id", "room_id", "area_item_id",
+            "reference_evidence_id", "reference_digest", "reference_digest_status",
+            "reference_verification_id", "reference_capture_slot_id", "region_box",
+            "creator", "creator_side", "created_at", "supersedes_target_id",
+        )
+        canonical = {field: record[field] for field in fields}
+        return hashlib.sha256(self._json(canonical).encode("utf-8")).hexdigest()
+
+    def _target_nomination_view(self, target_id: str) -> dict:
+        record = self._load(self.target_nominations, target_id, "target_nomination")
+        inspection = self._load(self.inspections, record["inspection_id"], "inspection")
+        snapshot = inspection.get("contents_committed", {})
+        frozen_ids = snapshot.get("target_nomination_ids", [])
+        if target_id in self.target_superseded_by:
+            lifecycle = "SUPERSEDED"
+        elif inspection.get("status") == "FROZEN" and target_id in frozen_ids:
+            lifecycle = "FROZEN"
+        else:
+            lifecycle = "NOMINATED"
+        record["lifecycle_status"] = lifecycle
+        record["is_latest_version"] = (
+            self.target_latest_by_identity.get(
+                self._target_identity_key(
+                    record["inspection_id"], record["area_item_id"],
+                    record["target_identifier"],
+                ), ""
+            ) == target_id
+        )
+        provenance_status = "NONE"
+        provenance_verification_id = ""
+        retrieved_digest = ""
+        if record.get("reference_evidence_id"):
+            provenance_status = "CALLER_ASSERTED_UNVERIFIED"
+            provenance_verification_id = self.latest_verification_by_evidence.get(
+                record["reference_evidence_id"], ""
+            )
+            if provenance_verification_id:
+                verification = self._load(
+                    self.evidence_verifications, provenance_verification_id,
+                    "evidence_verification",
+                )
+                retrieved_digest = verification.get("retrieved_sha256", "")
+                if verification.get("outcome") == "VERIFIED":
+                    if retrieved_digest == record.get("reference_digest"):
+                        provenance_status = "VERIFIED_RETRIEVED_SHA256"
+                    else:
+                        provenance_status = "VERIFICATION_BINDING_MISMATCH"
+                elif verification.get("outcome") == "DIGEST_MISMATCH":
+                    provenance_status = "DIGEST_MISMATCH"
+                else:
+                    provenance_status = verification.get("outcome", "UNRESOLVED")
+        record["reference_provenance"] = {
+            "status": provenance_status,
+            "verification_id": provenance_verification_id,
+            "retrieved_sha256": retrieved_digest,
+        }
+        return record
+
     def _load(self, records: TreeMap[str, str], record_id: str, kind: str) -> dict:
         self._text(record_id, u256(64), kind)
         if record_id not in records:
@@ -967,16 +1071,22 @@ class MoveOutProtocolV1(gl.Contract):
             json.loads(self.conditions_by_inspection.get(inspection_id, "[]")) == conditions and
             json.loads(self.evidence_by_inspection.get(inspection_id, "[]")) == evidence_ids and
             json.loads(self.capture_slots_by_inspection.get(inspection_id, "[]")) == slot_ids and
-            json.loads(self.maintenance_by_inspection.get(inspection_id, "[]")) == maintenance_ids
+            json.loads(self.maintenance_by_inspection.get(inspection_id, "[]")) == maintenance_ids and
+            json.loads(self.target_nominations_by_inspection.get(inspection_id, "[]")) ==
+            inspection.get("target_nomination_ids", [])
         )
         snapshot = inspection.get("contents_committed", {})
-        snapshot_matches = (
-            inspection["status"] != "FROZEN" or snapshot == {
-                "room_ids": rooms, "area_item_ids": areas,
-                "condition_record_ids": conditions, "evidence_ids": evidence_ids,
-                "capture_slot_ids": slot_ids, "maintenance_event_ids": maintenance_ids,
-            }
-        )
+        expected_snapshot = {
+            "room_ids": rooms, "area_item_ids": areas,
+            "condition_record_ids": conditions, "evidence_ids": evidence_ids,
+            "capture_slot_ids": slot_ids, "maintenance_event_ids": maintenance_ids,
+        }
+        if "target_nomination_ids" in snapshot:
+            expected_snapshot["target_nomination_ids"] = inspection.get(
+                "target_nomination_ids", []
+            )
+        snapshot_matches = (inspection["status"] != "FROZEN" or
+                            snapshot == expected_snapshot)
         checks = {
             "has_room": bool(rooms),
             "every_room_has_area_item": every_room_has_area,
@@ -1346,6 +1456,186 @@ class MoveOutProtocolV1(gl.Contract):
         self._remember("include_area_in_inspection", request_id, payload, inspection_id)
 
     @gl.public.write
+    def create_target_nomination(self, inspection_id: str, area_item_id: str,
+                                 target_identifier: str, target_description: str,
+                                 reference_evidence_id: str,
+                                 reference_capture_slot_id: str,
+                                 region_box_json: str, supersedes_target_id: str,
+                                 request_id: str) -> str:
+        """Create immutable target metadata; this API does not assess an image."""
+        identifier = self._text(target_identifier, u256(self.MAX_TARGET_IDENTIFIER),
+                                "target_identifier")
+        if (identifier[0] not in "abcdefghijklmnopqrstuvwxyz0123456789" or
+                identifier[-1] not in "abcdefghijklmnopqrstuvwxyz0123456789" or
+                any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for char in identifier)):
+            self._fail("MO_ERR_SCHEMA", "target_identifier_must_be_lowercase_slug")
+        description = self._text(target_description, u256(self.MAX_TEXT),
+                                 "target_description", allow_empty=True)
+        evidence_id = self._text(reference_evidence_id, u256(64),
+                                 "reference_evidence_id", allow_empty=True)
+        capture_slot_id = self._text(reference_capture_slot_id, u256(64),
+                                     "reference_capture_slot_id", allow_empty=True)
+        supersedes_id = self._text(supersedes_target_id, u256(64),
+                                   "supersedes_target_id", allow_empty=True)
+        region_box = self._target_region_box(region_box_json)
+        if region_box is not None and not evidence_id:
+            self._fail("MO_ERR_SCHEMA", "target_region_requires_reference_evidence")
+        payload = {
+            "inspection_id": inspection_id, "area_item_id": area_item_id,
+            "target_identifier": identifier, "target_description": description,
+            "reference_evidence_id": evidence_id,
+            "reference_capture_slot_id": capture_slot_id,
+            "region_box": region_box, "supersedes_target_id": supersedes_id,
+        }
+        replay = self._idempotent_replay("create_target_nomination", request_id, payload)
+        if replay:
+            return replay
+
+        inspection, tenancy, area, room = self._record_parent_context(
+            inspection_id, area_item_id
+        )
+        self._require_same_participant_side(tenancy, self._sender())
+        add_area_membership = area_item_id not in inspection["area_item_ids"]
+
+        if capture_slot_id:
+            slot = self._load(self.capture_slots, capture_slot_id, "capture_slot")
+            if (slot["inspection_id"] != inspection_id or
+                    slot["area_item_id"] != area_item_id or
+                    slot["room_id"] != room["room_id"] or
+                    slot["tenancy_id"] != tenancy["tenancy_id"]):
+                self._fail("MO_ERR_WRONG_SCOPE", "target_capture_slot_binding")
+
+        reference_digest = ""
+        digest_status = "NONE"
+        if evidence_id:
+            evidence = self._load(self.evidence_records, evidence_id, "evidence")
+            if (evidence.get("status") != "FROZEN" or
+                    evidence.get("inspection_id") != inspection_id or
+                    evidence.get("area_item_id") != area_item_id or
+                    evidence.get("room_id") != room["room_id"] or
+                    evidence.get("tenancy_id") != tenancy["tenancy_id"] or
+                    evidence.get("evidence_type") != "PHOTO"):
+                self._fail("MO_ERR_WRONG_SCOPE", "target_reference_evidence_binding")
+            reference_digest = evidence["expected_sha256"]
+            evidence_slot = evidence.get("capture_slot_id", "")
+            if capture_slot_id and evidence_slot != capture_slot_id:
+                self._fail("MO_ERR_WRONG_SCOPE", "target_reference_slot_mismatch")
+            if not capture_slot_id:
+                capture_slot_id = evidence_slot
+            # Evidence verification requires the parent inspection to be
+            # frozen, while nominations must be made before that boundary.
+            # Bind the caller-asserted expected digest here and expose later
+            # retrieved-digest verification dynamically in read APIs.
+            digest_status = "CALLER_ASSERTED_EXPECTED_SHA256"
+
+        identity_key = self._target_identity_key(
+            inspection_id, area_item_id, identifier
+        )
+        latest_target_id = self.target_latest_by_identity.get(identity_key, "")
+        target_version = 1
+        if supersedes_id:
+            previous = self._load(
+                self.target_nominations, supersedes_id, "target_nomination"
+            )
+            if (previous.get("inspection_id") != inspection_id or
+                    previous.get("area_item_id") != area_item_id or
+                    previous.get("target_identifier") != identifier or
+                    supersedes_id in self.target_superseded_by):
+                self._fail("MO_ERR_WRONG_SCOPE", "target_supersession_binding")
+            if latest_target_id != supersedes_id:
+                self._fail("MO_ERR_DUPLICATE", "target_supersession_not_latest")
+            target_version = previous["target_version"] + 1
+        elif latest_target_id:
+            self._fail("MO_ERR_DUPLICATE", "target_identity_already_nominated")
+
+        target_ids = inspection.get("target_nomination_ids", [])
+        area_key = self._json([inspection_id, area_item_id])
+        area_target_ids = json.loads(
+            self.target_nominations_by_inspection_area.get(area_key, "[]")
+        )
+        if len(target_ids) >= int(self.MAX_TARGET_NOMINATIONS_PER_INSPECTION):
+            self._fail("MO_ERR_BOUNDS", "target_nominations_per_inspection")
+        if len(area_target_ids) >= int(self.MAX_TARGET_NOMINATIONS_PER_AREA):
+            self._fail("MO_ERR_BOUNDS", "target_nominations_per_area")
+
+        if add_area_membership:
+            self._add_inspection_membership(inspection, room["room_id"], area_item_id)
+
+        target_id = self._new_id("TARG", self.target_nomination_seq)
+        record = {
+            "digest_domain": "MOVEOUT_TARGET_NOMINATION_V1",
+            "schema_version": self.TARGET_NOMINATION_SCHEMA_VERSION,
+            "target_id": target_id, "target_version": target_version,
+            "target_identifier": identifier, "target_description": description,
+            "inspection_id": inspection_id, "property_id": inspection["property_id"],
+            "unit_id": inspection["unit_id"], "tenancy_id": tenancy["tenancy_id"],
+            "room_id": room["room_id"], "area_item_id": area_item_id,
+            "reference_evidence_id": evidence_id, "reference_digest": reference_digest,
+            "reference_digest_status": digest_status,
+            "reference_verification_id": "",
+            "reference_capture_slot_id": capture_slot_id,
+            "region_box": region_box, "creator": self._sender(),
+            "creator_side": self._require_same_participant_side(tenancy, self._sender()),
+            "created_at": self._now(), "supersedes_target_id": supersedes_id,
+        }
+        record["target_nomination_digest"] = self._target_nomination_digest(record)
+
+        self.target_nomination_seq += u256(1)
+        self.target_nominations[target_id] = self._json(record)
+        if supersedes_id:
+            self.target_superseded_by[supersedes_id] = target_id
+        self.target_latest_by_identity[identity_key] = target_id
+        self._append(self.target_nominations_by_inspection, inspection_id, target_id,
+                     u256(self.MAX_TARGET_NOMINATIONS_PER_INSPECTION),
+                     "target_nominations_per_inspection")
+        self._append(self.target_nominations_by_inspection_area, area_key, target_id,
+                     u256(self.MAX_TARGET_NOMINATIONS_PER_AREA),
+                     "target_nominations_per_area")
+        if target_id not in target_ids:
+            target_ids.append(target_id)
+            inspection["target_nomination_ids"] = target_ids
+            self.inspections[inspection_id] = self._json(inspection)
+        self._append_event(inspection["property_id"], "TARGET_NOMINATION_CREATED",
+                           "target_nomination", target_id)
+        self._remember("create_target_nomination", request_id, payload, target_id)
+        return target_id
+
+    @gl.public.view
+    def get_target_nomination(self, target_id: str) -> str:
+        return self._json(self._target_nomination_view(target_id))
+
+    @gl.public.view
+    def list_target_nominations(self, inspection_id: str,
+                                offset: u256, limit: u256) -> str:
+        self._load(self.inspections, inspection_id, "inspection")
+        page = json.loads(self._page(
+            self.target_nominations_by_inspection, self.target_nominations,
+            inspection_id, offset, limit,
+        ))
+        page["items"] = [self._target_nomination_view(item["target_id"])
+                         for item in page["items"]]
+        return self._json(page)
+
+    @gl.public.view
+    def list_area_target_nominations(self, inspection_id: str, area_item_id: str,
+                                     offset: u256, limit: u256) -> str:
+        inspection = self._load(self.inspections, inspection_id, "inspection")
+        area = self._load(self.area_items, area_item_id, "area_item")
+        if (area["property_id"] != inspection["property_id"] or
+                area["unit_id"] != inspection["unit_id"]):
+            self._fail("MO_ERR_WRONG_SCOPE", "target_list_area_binding")
+        area_key = self._json([inspection_id, area_item_id])
+        if int(limit) == 0 or int(limit) > int(self.MAX_PAGE_SIZE):
+            self._fail("MO_ERR_BOUNDS", "page_limit")
+        ids = json.loads(self.target_nominations_by_inspection_area.get(area_key, "[]"))
+        start = int(offset)
+        stop = min(start + int(limit), len(ids))
+        records = [self._target_nomination_view(ids[position])
+                   for position in range(start, stop)]
+        return self._json({"items": records, "next_offset": stop,
+                           "has_more": stop < len(ids)})
+
+    @gl.public.write
     def create_capture_slot(self, inspection_id: str, area_item_id: str,
                             slot_type: str, label: str, instructions: str,
                             continuity_slot_id: str, continuity_evidence_id: str,
@@ -1689,6 +1979,9 @@ class MoveOutProtocolV1(gl.Contract):
             "condition_record_ids": inspection["condition_record_ids"],
             "evidence_ids": inspection["evidence_ids"],
             "capture_slot_ids": inspection.get("capture_slot_ids", []),
+            # Legacy inspections have no nomination field; expose an empty
+            # frozen target set without rewriting historical records on reads.
+            "target_nomination_ids": inspection.get("target_nomination_ids", []),
             "maintenance_event_ids": inspection.get("maintenance_event_ids", []),
         }
         self.inspections[inspection_id] = self._json(inspection)
