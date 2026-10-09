@@ -10,6 +10,7 @@ import json
 import re
 
 from PIL import Image
+from hypothesis import HealthCheck, given, settings, strategies as st
 import pytest
 
 
@@ -560,3 +561,77 @@ def test_conflict_and_unavailable_statuses_remain_explicit_in_request_history(co
 
 
     assert view["events"][0]["event_type"] == "OPEN"
+
+
+def test_stage54_adversarial_assessment_event_reopens_closed_request(continuity_world):
+    """Exercise request closure against a later assessment and new capture path."""
+    w = continuity_world
+    c, vm = w["contract"], w["vm"]
+    with vm.prank(w["manager"]):
+        c.close_supplemental_request(
+            w["request"], "Requester closed capture request", "s54-close-request"
+        )
+    assert json.loads(c.get_supplemental_request(w["request"]))["lifecycle_status"] == "CLOSED"
+
+    # Assessment of already-frozen evidence is accepted after closure and appends
+    # a later event. Public lifecycle status is event-last rather than terminal.
+    post_close_assessment = assess(w)
+    assert post_close_assessment["continuity_assessment_id"]
+    view = json.loads(c.get_supplemental_request(w["request"]))
+    assert view["lifecycle_status"] == "ASSESSMENT_APPENDED"
+
+    # create_supplemental_inspection only rejects when the latest event itself is
+    # CLOSED, so the post-close assessment permits another linked inspection.
+    with vm.prank(w["manager"]):
+        reopened_inspection = c.create_supplemental_inspection(
+            w["request"], "s54-reopen-after-close"
+        )
+    assert reopened_inspection in json.loads(c.get_supplemental_request(
+        w["request"]))["supplemental_inspection_ids"]
+
+    late_bytes = png((12, 34, 56))
+    late_digest = hashlib.sha256(late_bytes).hexdigest()
+    with vm.prank(w["manager"]):
+        late_evidence = c.submit_supplemental_evidence(
+            w["request"], reopened_inspection, URL_C, late_digest, "", "UNKNOWN",
+            "UNKNOWN", "", "s54-submit-after-close"
+        )
+    final_view = json.loads(c.get_supplemental_request(w["request"]))
+    assert late_evidence in final_view["supplemental_evidence_ids"]
+    assert final_view["lifecycle_status"] == "EVIDENCE_SUBMITTED"
+
+
+@settings(max_examples=24, derandomize=True, deadline=None,
+          suppress_health_check=[HealthCheck.function_scoped_fixture,
+                                 HealthCheck.too_slow])
+@given(
+    surface=st.sampled_from(("VISIBLE", "PARTIAL", "NOT_ESTABLISHED", "UNCERTAIN")),
+    location=st.sampled_from(("LOCATED", "NOT_LOCATABLE", "UNCERTAIN")),
+    visibility=st.sampled_from(("ADEQUATE", "INADEQUATE", "UNCERTAIN")),
+    obstruction=st.sampled_from(("PRESENT", "ABSENT", "UNCERTAIN")),
+    frame=st.sampled_from(("IN_FRAME", "PARTLY_OUTSIDE", "OUTSIDE", "UNCERTAIN")),
+    clarity=st.sampled_from(("ADEQUATE", "INADEQUATE", "UNCERTAIN")),
+    feature=st.sampled_from(("PRESENT", "ABSENT", "UNCERTAIN")),
+)
+def test_stage54_property_accepted_absence_always_has_all_visibility_gates(
+        continuity_world, surface, location, visibility, obstruction, frame, clarity,
+        feature):
+    """Generated schema candidates may accept ABSENT only under every gate."""
+    observations = {
+        "surface_visibility": surface,
+        "target_location": location,
+        "target_visibility": visibility,
+        "foreground_obstruction": obstruction,
+        "frame_coverage": frame,
+        "target_clarity": clarity,
+        "feature_presence": feature,
+    }
+    normalized, valid = continuity_world["contract"]._normalize_target_observation(
+        observations
+    )
+    if valid and normalized["feature_presence"] == "ABSENT":
+        assert normalized["target_location"] == "LOCATED"
+        assert normalized["target_visibility"] == "ADEQUATE"
+        assert normalized["foreground_obstruction"] == "ABSENT"
+        assert normalized["frame_coverage"] == "IN_FRAME"
+        assert normalized["target_clarity"] == "ADEQUATE"
