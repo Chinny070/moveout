@@ -563,42 +563,100 @@ def test_conflict_and_unavailable_statuses_remain_explicit_in_request_history(co
     assert view["events"][0]["event_type"] == "OPEN"
 
 
-def test_stage54_adversarial_assessment_event_reopens_closed_request(continuity_world):
-    """Exercise request closure against a later assessment and new capture path."""
+def test_stage55_closed_request_stays_terminal_while_frozen_evidence_is_assessed(continuity_world):
+    """Post-close assessment remains auditable but cannot reopen capture."""
     w = continuity_world
     c, vm = w["contract"], w["vm"]
+    # A pre-existing open inspection remains available for a negative test of
+    # late evidence submission after its parent request is closed.
+    with vm.prank(w["manager"]):
+        existing_open_inspection = c.create_supplemental_inspection(
+            w["request"], "s55-inspection-before-close"
+        )
+    frozen_request = c.get_supplemental_request(w["request"])
+    frozen_original = c.inspections[w["original_inspection"]]
+    frozen_parent_evidence = c.evidence_records[w["original_evidence"]]
+    frozen_supplemental_evidence = c.evidence_records[w["supplemental_evidence"]]
+    frozen_supplemental_inspection = c.inspections[w["supplemental_inspection"]]
     with vm.prank(w["manager"]):
         c.close_supplemental_request(
             w["request"], "Requester closed capture request", "s54-close-request"
         )
     assert json.loads(c.get_supplemental_request(w["request"]))["lifecycle_status"] == "CLOSED"
 
-    # Assessment of already-frozen evidence is accepted after closure and appends
-    # a later event. Public lifecycle status is event-last rather than terminal.
+    # Already-frozen evidence may still be assessed and conflicting results
+    # remain visible in the append-only audit, while lifecycle status is terminal.
     post_close_assessment = assess(w)
     assert post_close_assessment["continuity_assessment_id"]
+    contradictory = assess(w, continuity_answer("NOT_SUPPORTED", "CONTRADICTORY_CUES"))
+    assert contradictory["assessment_status"] == "CONFLICTED"
     view = json.loads(c.get_supplemental_request(w["request"]))
-    assert view["lifecycle_status"] == "ASSESSMENT_APPENDED"
+    assert view["lifecycle_status"] == "CLOSED"
+    assert [e["event_type"] for e in view["events"]].count("ASSESSMENT_APPENDED") == 2
 
-    # create_supplemental_inspection only rejects when the latest event itself is
-    # CLOSED, so the post-close assessment permits another linked inspection.
     with vm.prank(w["manager"]):
-        reopened_inspection = c.create_supplemental_inspection(
-            w["request"], "s54-reopen-after-close"
+        with vm.expect_revert("MO_ERR_STATE:supplemental_request_closed"):
+            c.create_supplemental_inspection(w["request"], "s55-create-after-close")
+        with vm.expect_revert("MO_ERR_STATE:supplemental_request_closed"):
+            c.submit_supplemental_evidence(
+                w["request"], existing_open_inspection, URL_C,
+                hashlib.sha256(png((12, 34, 56))).hexdigest(), "", "UNKNOWN",
+                "UNKNOWN", "", "s55-submit-after-close",
+            )
+        # Exact idempotent close retries are safe, but a new close request key
+        # cannot append a second closure after later audit events.
+        c.close_supplemental_request(
+            w["request"], "Requester closed capture request", "s54-close-request"
         )
-    assert reopened_inspection in json.loads(c.get_supplemental_request(
-        w["request"]))["supplemental_inspection_ids"]
-
-    late_bytes = png((12, 34, 56))
-    late_digest = hashlib.sha256(late_bytes).hexdigest()
-    with vm.prank(w["manager"]):
-        late_evidence = c.submit_supplemental_evidence(
-            w["request"], reopened_inspection, URL_C, late_digest, "", "UNKNOWN",
-            "UNKNOWN", "", "s54-submit-after-close"
-        )
+        with vm.expect_revert("MO_ERR_STATE:supplemental_request_closed"):
+            c.close_supplemental_request(
+                w["request"], "Second closure", "s55-second-close"
+            )
     final_view = json.loads(c.get_supplemental_request(w["request"]))
-    assert late_evidence in final_view["supplemental_evidence_ids"]
-    assert final_view["lifecycle_status"] == "EVIDENCE_SUBMITTED"
+    assert final_view["lifecycle_status"] == "CLOSED"
+    assert final_view["supplemental_inspection_ids"].count(existing_open_inspection) == 1
+    assert final_view["supplemental_evidence_ids"] == [w["supplemental_evidence"]]
+    assert c.get_supplemental_request(w["request"]) != frozen_request
+    assert c.inspections[w["original_inspection"]] == frozen_original
+    assert c.evidence_records[w["original_evidence"]] == frozen_parent_evidence
+    assert c.evidence_records[w["supplemental_evidence"]] == frozen_supplemental_evidence
+    assert c.inspections[w["supplemental_inspection"]] == frozen_supplemental_inspection
+
+
+def test_stage55_malformed_post_close_assessment_does_not_append(continuity_world):
+    w = continuity_world
+    c, vm = w["contract"], w["vm"]
+    with vm.prank(w["manager"]):
+        c.close_supplemental_request(w["request"], "done", "s55-malformed-close")
+    before = json.loads(c.get_supplemental_request(w["request"]))
+    vm.clear_mocks()
+    mock_bytes(vm, URL_A, w["original_bytes"])
+    mock_bytes(vm, URL_B, w["supplement_bytes"])
+    vm.mock_llm(r"Compare image A", json.dumps({"invalid": True}))
+    with vm.expect_revert("MO_ERR_INCONCLUSIVE"):
+        c.assess_supplemental_continuity(
+            w["request"], w["supplemental_evidence"], "s55-malformed-after-close"
+        )
+    after = json.loads(c.get_supplemental_request(w["request"]))
+    assert after["lifecycle_status"] == "CLOSED"
+    assert after["events"] == before["events"]
+    assert after["continuity_assessment_ids"] == before["continuity_assessment_ids"]
+
+
+def test_stage55_only_requester_can_close_and_cross_binding_keeps_closed_state(continuity_world):
+    w = continuity_world
+    c, vm = w["contract"], w["vm"]
+    with vm.prank(w["outsider"]):
+        with vm.expect_revert("MO_ERR_UNAUTHORIZED:tenancy_participant_required"):
+            c.close_supplemental_request(w["request"], "unauthorized", "s55-outsider-close")
+    with vm.prank(w["manager"]):
+        c.close_supplemental_request(w["request"], "done", "s55-binding-close")
+    before = json.loads(c.get_supplemental_request(w["request"]))
+    with pytest.raises(Exception, match="supplemental_evidence_request_binding"):
+        c._prepare_continuity_pair(w["request"], w["original_evidence"])
+    after = json.loads(c.get_supplemental_request(w["request"]))
+    assert after["lifecycle_status"] == "CLOSED"
+    assert after["events"] == before["events"]
 
 
 @settings(max_examples=24, derandomize=True, deadline=None,

@@ -1978,15 +1978,30 @@ class MoveOutProtocolV1(gl.Contract):
                            "supplemental_request", supplemental_request_id)
         return event_id
 
+    def _supplemental_request_is_closed(self, supplemental_request_id: str) -> bool:
+        """Closure is terminal even when later audit or assessment events are appended."""
+        event_ids = json.loads(self.supplemental_request_event_ids.get(
+            supplemental_request_id, "[]"))
+        for event_id in event_ids:
+            event = json.loads(self.supplemental_request_events[event_id])
+            if event.get("event_type") == "CLOSED":
+                return True
+        return False
+
     def _supplemental_request_view(self, supplemental_request_id: str) -> dict:
         request = self._load(self.supplemental_requests, supplemental_request_id,
                              "supplemental_request")
         events = [json.loads(self.supplemental_request_events[item]) for item in
                   json.loads(self.supplemental_request_event_ids.get(
                       supplemental_request_id, "[]"))]
+        lifecycle_status = "OPEN"
+        if self._supplemental_request_is_closed(supplemental_request_id):
+            lifecycle_status = "CLOSED"
+        elif events:
+            lifecycle_status = events[-1]["event_type"]
         return {
             **request,
-            "lifecycle_status": events[-1]["event_type"] if events else "OPEN",
+            "lifecycle_status": lifecycle_status,
             "supplemental_inspection_ids": json.loads(
                 self.supplemental_inspections_by_request.get(supplemental_request_id, "[]")),
             "supplemental_evidence_ids": json.loads(
@@ -2098,16 +2113,13 @@ class MoveOutProtocolV1(gl.Contract):
         tenancy = self._require_participant(request["tenancy_id"])
         if request.get("supplemental_request_digest") != self._supplemental_request_digest(request):
             self._fail("MO_ERR_PROVENANCE", "supplemental_request_digest_mismatch")
-        events = [json.loads(self.supplemental_request_events[item]) for item in
-                  json.loads(self.supplemental_request_event_ids.get(
-                      supplemental_request_id, "[]"))]
-        if events and events[-1].get("event_type") == "CLOSED":
-            self._fail("MO_ERR_STATE", "supplemental_request_closed")
         payload = {"supplemental_request_id": supplemental_request_id,
                    "request_digest": request["supplemental_request_digest"]}
         replay = self._idempotent_replay("create_supplemental_inspection", request_id, payload)
         if replay:
             return replay
+        if self._supplemental_request_is_closed(supplemental_request_id):
+            self._fail("MO_ERR_STATE", "supplemental_request_closed")
         ids = json.loads(self.supplemental_inspections_by_request.get(
             supplemental_request_id, "[]"))
         if len(ids) >= int(self.MAX_SUPPLEMENTAL_INSPECTIONS_PER_REQUEST):
@@ -2198,10 +2210,7 @@ class MoveOutProtocolV1(gl.Contract):
         replay = self._idempotent_replay("close_supplemental_request", request_id, payload)
         if replay:
             return
-        events = [json.loads(self.supplemental_request_events[item]) for item in
-                  json.loads(self.supplemental_request_event_ids.get(
-                      supplemental_request_id, "[]"))]
-        if events and events[-1].get("event_type") == "CLOSED":
+        if self._supplemental_request_is_closed(supplemental_request_id):
             self._fail("MO_ERR_STATE", "supplemental_request_closed")
         self._append_supplemental_request_event(supplemental_request_id, "CLOSED", "",
                                                 {"reason": reason})
@@ -2800,10 +2809,7 @@ class MoveOutProtocolV1(gl.Contract):
                     supplement_request["area_item_id"] != area_item_id or
                     supplement_request["tenancy_id"] != tenancy["tenancy_id"]):
                 self._fail("MO_ERR_WRONG_SCOPE", "supplemental_evidence_request_binding")
-            request_events = [json.loads(self.supplemental_request_events[item]) for item in
-                              json.loads(self.supplemental_request_event_ids.get(
-                                  supplemental_request_id, "[]"))]
-            if request_events and request_events[-1].get("event_type") == "CLOSED":
+            if self._supplemental_request_is_closed(supplemental_request_id):
                 self._fail("MO_ERR_STATE", "supplemental_request_closed")
         if slot_id:
             slot = self._load(self.capture_slots, slot_id, "capture_slot")
