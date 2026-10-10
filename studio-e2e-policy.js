@@ -44,6 +44,10 @@ export function stepUnlocked(state, step) {
   return true;
 }
 
+export function isRecheckCandidate(step) {
+  return Boolean(step?.hash && ['PASS', 'RECHECKING', 'UNRESOLVED'].includes(step.status));
+}
+
 export function classifyReceipt(receipt) {
   if(receipt?.statusName!=='FINALIZED') return {status:'UNRESOLVED',reason:`Not finalized (${receipt?.statusName ?? 'unknown status'})`};
   if(receipt?.txExecutionResultName!=='FINISHED_WITH_RETURN') return {status:'FAILED',reason:`Finalized without successful contract return (${receipt?.txExecutionResultName ?? 'execution result unknown'})`};

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectWallet, normalizeChainId, STUDIONET_CHAIN_ID, switchToStudioNet } from '../../studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, confirmed } from '../../studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, confirmed } from '../../studio-e2e-policy.js';
 
 test('normalizes hex and decimal chain IDs', () => {
   assert.equal(normalizeChainId('0xf22f'), STUDIONET_CHAIN_ID);
@@ -96,6 +96,13 @@ test('refresh restoration preserves chain records and requires wallet reconnect 
   restored.steps.network.status='PASS';
   restored.steps.property.status='PASS';
   assert.equal(stepUnlocked(restored,'property'),true);
+});
+
+test('unresolved submitted steps with a transaction hash remain eligible for read-only reconciliation', () => {
+  assert.equal(isRecheckCandidate({status:'UNRESOLVED',hash:'0xsubmitted'}),true);
+  assert.equal(isRecheckCandidate({status:'PASS',hash:'0xfinalized'}),true);
+  assert.equal(isRecheckCandidate({status:'UNRESOLVED'}),false);
+  assert.equal(isRecheckCandidate({status:'IN_PROGRESS',hash:'0xmaybe'}),false);
 });
 
 test('legacy E2E progress preserves identifiers but requires the new photo verification before final readback', () => {

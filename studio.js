@@ -3,7 +3,7 @@ import { studionet } from 'genlayer-js/chains';
 import { TransactionStatus } from 'genlayer-js/types';
 import { connectWallet, normalizeChainId, switchToStudioNet, STUDIONET_CHAIN_ID } from './studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from './studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, confirmed as confirmE2E } from './studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, confirmed as confirmE2E } from './studio-e2e-policy.js';
 
 const RPC = 'https://studio.genlayer.com/api';
 const CONTRACT = '0x4F96B354b19541F7087b73c548Dc2db380e09b77';
@@ -267,7 +267,16 @@ async function readbackRecords() {
 async function verifySavedStep(key,cache=new Map()) {
   const id=e2e.ids;
   const get=(name,args)=>{const key=`${name}:${JSON.stringify(args)}`;if(!cache.has(key))cache.set(key,read(name,args));return cache.get(key);};
-  if(key==='property') { const r=await get('get_property',{property_id:id.property_id});return matchesRecord(r,{property_id:id.property_id,property_label:e2e.propertyLabel})&&sameAddress(r.creator,e2e.managerAddress); }
+  if(key==='property') {
+    if(!id.property_id) {
+      const list=await get('list_properties',{creator:e2e.managerAddress,offset:0,limit:50});
+      const matches=paged(list).filter((r)=>r.property_label===e2e.propertyLabel&&sameAddress(r.creator,e2e.managerAddress));
+      if(matches.length!==1)return false;
+      id.property_id=matches[0].property_id;
+      saveE2E();
+    }
+    const r=await get('get_property',{property_id:id.property_id});return matchesRecord(r,{property_id:id.property_id,property_label:e2e.propertyLabel})&&sameAddress(r.creator,e2e.managerAddress);
+  }
   if(key==='unit') return matchesRecord(await get('get_unit',{unit_id:id.unit_id}),{unit_id:id.unit_id,property_id:id.property_id,unit_label:e2e.unitLabel});
   if(key==='tenancy') { const r=await get('get_tenancy',{tenancy_id:id.tenancy_id});return matchesRecord(r,{tenancy_id:id.tenancy_id,property_id:id.property_id,unit_id:id.unit_id,status:'DRAFT'})&&sameAddress(r.tenant,e2e.tenantAddress); }
   if(key==='inspection') return matchesRecord(await get('get_inspection',{inspection_id:id.inspection_id}),{inspection_id:id.inspection_id,tenancy_id:id.tenancy_id,inspection_type:'MOVE_IN'});
@@ -284,14 +293,22 @@ async function verifySavedStep(key,cache=new Map()) {
   return false;
 }
 async function recheckSavedProgress({automatic=false}={}) {
-  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&['PASS','RECHECKING'].includes(e2e.steps[key]?.status));
+  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&isRecheckCandidate(e2e.steps[key]));
   if(!keys.length){if(!automatic)alert('No finalized StudioNet test steps are saved to recheck. No transaction was sent.');return;}
   if(!automatic)alert('Re-reading saved records from finalized StudioNet state. No transaction will be sent.');
   let chainVerified=true;
   const cache=new Map();
   for(const key of keys){
     let ok=false;
-    try { ok=chainVerified&&Boolean(e2e.steps[key]?.hash)&&await verifySavedStep(key,cache); } catch { ok=false; }
+    try {
+      const step=e2e.steps[key];
+      let finalized=Boolean(step?.hash);
+      if(finalized&&step.status==='UNRESOLVED') {
+        const receipt=await reader.waitForTransactionReceipt({hash:step.hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000});
+        finalized=classifyReceipt(receipt).status==='FINALIZED';
+      }
+      ok=chainVerified&&finalized&&await verifySavedStep(key,cache);
+    } catch { ok=false; }
     if(!ok){chainVerified=false;saveStep(key,'UNRESOLVED',{message:'Could not independently confirm this saved step from the current finalized contract view. Check its transaction hash; do not resubmit.'});}
     else saveStep(key,'PASS',{message:'Re-read and matched the finalized contract record after page refresh.'});
   }
