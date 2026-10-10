@@ -119,6 +119,10 @@ test('E2E requires finality and successful execution before state verification',
   assert.equal(classifyReceipt({statusName:'ACCEPTED',txExecutionResultName:'FINISHED_WITH_RETURN'}).status,'UNRESOLVED');
   assert.equal(classifyReceipt({statusName:'FINALIZED',txExecutionResultName:'FINISHED_WITH_ERROR'}).status,'FAILED');
   assert.equal(classifyReceipt({statusName:'FINALIZED',txExecutionResultName:'FINISHED_WITH_RETURN'}).status,'FINALIZED');
+  assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_AGREE',consensus_data:{leader_receipt:[{mode:'leader',execution_result:'SUCCESS'}]}}).status,'FINALIZED');
+  assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_AGREE',consensus_data:{leader_receipt:[{mode:'leader',execution_result:'ERROR'}]}}).status,'FAILED');
+  assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_DISAGREE',consensus_data:{leader_receipt:[{mode:'leader',execution_result:'SUCCESS'}]}}).status,'FAILED');
+  assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_AGREE'}).status,'UNRESOLVED');
 });
 
 test('on-chain state verification compares required record fields exactly', () => {

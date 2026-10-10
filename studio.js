@@ -105,6 +105,15 @@ function errorText(error) {
   if (error?.code === 4001) return 'Wallet request was rejected. No transaction was submitted.';
   return error?.shortMessage || error?.message || String(error);
 }
+function receiptSummary(receipt) {
+  const leaders=receipt?.consensus_data?.leader_receipt??receipt?.consensus_data?.leaderReceipt??[];
+  const leader=Array.isArray(leaders)?leaders.find((entry)=>entry?.mode==='leader')??leaders[0]:leaders;
+  return {
+    status:receipt?.statusName??receipt?.status_name??'unknown',
+    execution:receipt?.txExecutionResultName??receipt?.tx_execution_result_name??receipt?.execution_result??leader?.execution_result??'unknown',
+    consensus:receipt?.resultName??receipt?.result_name??'consensus result unavailable',
+  };
+}
 function panel(title, rows, actions = '') {
   return `<section class="studio-card"><div class="studio-card-head"><h2>${esc(title)}</h2>${actions}</div>${rows}</section>`;
 }
@@ -225,13 +234,13 @@ async function e2eWrite(key,methodName,values,verify) {
     try { receipt=await writer.waitForTransactionReceipt({hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000}); }
     catch(error) { saveStep(key,'UNRESOLVED',{hash,message:`Receipt/finality could not be confirmed: ${errorText(error)}. Use this hash to check the chain; do not submit again.`});await loadHome();return; }
     const outcome=classifyReceipt(receipt);
-    const consensus=receipt.resultName??'consensus result unavailable';
-    if(outcome.status!=='FINALIZED') { saveStep(key,outcome.status,{hash,receiptStatus:`${receipt.statusName??'unknown'} / ${receipt.txExecutionResultName??'unknown'} / ${consensus}`,message:outcome.reason});await loadHome();return; }
+    const summary=receiptSummary(receipt);
+    if(outcome.status!=='FINALIZED') { saveStep(key,outcome.status,{hash,receiptStatus:`${summary.status} / ${summary.execution} / ${summary.consensus}`,message:outcome.reason});await loadHome();return; }
     const result=await verify();
-    if(!result?.ok){saveStep(key,'FAILED',{hash,receiptStatus:`FINALIZED / ${receipt.txExecutionResultName} / ${consensus}`,message:`Transaction finalized but expected application state was not verified: ${result?.reason??'no matching record returned'}.`});await loadHome();return;}
+    if(!result?.ok){saveStep(key,'FAILED',{hash,receiptStatus:`${summary.status} / ${summary.execution} / ${summary.consensus}`,message:`Transaction finalized but expected application state was not verified: ${result?.reason??'no matching record returned'}.`});await loadHome();return;}
     Object.assign(e2e.ids,result.ids??{});
     if(key==='property')e2e.managerAddress=account;
-    saveStep(key,'PASS',{hash,receiptStatus:`FINALIZED / ${receipt.txExecutionResultName} / ${consensus}`,message:result.message??'Finalized and matched to a contract view.'});
+    saveStep(key,'PASS',{hash,receiptStatus:`${summary.status} / ${summary.execution} / ${summary.consensus}`,message:result.message??'Finalized and matched to a contract view.'});
     await loadHome();
   } catch(error) { saveStep(key,'FAILED',{message:errorText(error)});await loadHome(); }
 }
@@ -300,17 +309,21 @@ async function recheckSavedProgress({automatic=false}={}) {
   const cache=new Map();
   for(const key of keys){
     let ok=false;
+    let receiptStatus;
     try {
       const step=e2e.steps[key];
       let finalized=Boolean(step?.hash);
       if(finalized&&step.status==='UNRESOLVED') {
         const receipt=await reader.waitForTransactionReceipt({hash:step.hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000});
-        finalized=classifyReceipt(receipt).status==='FINALIZED';
+        const outcome=classifyReceipt(receipt);
+        const summary=receiptSummary(receipt);
+        finalized=outcome.status==='FINALIZED';
+        receiptStatus=`${summary.status} / ${summary.execution} / ${summary.consensus}`;
       }
       ok=chainVerified&&finalized&&await verifySavedStep(key,cache);
     } catch { ok=false; }
     if(!ok){chainVerified=false;saveStep(key,'UNRESOLVED',{message:'Could not independently confirm this saved step from the current finalized contract view. Check its transaction hash; do not resubmit.'});}
-    else saveStep(key,'PASS',{message:'Re-read and matched the finalized contract record after page refresh.'});
+    else saveStep(key,'PASS',{...(receiptStatus?{receiptStatus}:{}),message:'Re-read and matched the finalized contract record after page refresh.'});
   }
   if(['PASS','RECHECKING'].includes(e2e.steps.readback?.status)){
     const allExpected=E2E_ORDER.slice(2,E2E_ORDER.indexOf('readback')).every(key=>e2e.steps[key]?.status==='PASS');

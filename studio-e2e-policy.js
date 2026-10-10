@@ -49,8 +49,17 @@ export function isRecheckCandidate(step) {
 }
 
 export function classifyReceipt(receipt) {
-  if(receipt?.statusName!=='FINALIZED') return {status:'UNRESOLVED',reason:`Not finalized (${receipt?.statusName ?? 'unknown status'})`};
-  if(receipt?.txExecutionResultName!=='FINISHED_WITH_RETURN') return {status:'FAILED',reason:`Finalized without successful contract return (${receipt?.txExecutionResultName ?? 'execution result unknown'})`};
+  const status=receipt?.statusName??receipt?.status_name;
+  const result=receipt?.resultName??receipt?.result_name;
+  const leaderReceipts=receipt?.consensus_data?.leader_receipt??receipt?.consensus_data?.leaderReceipt??[];
+  const leaderReceipt=Array.isArray(leaderReceipts)?leaderReceipts.find((entry)=>entry?.mode==='leader')??leaderReceipts[0]:leaderReceipts;
+  const execution=receipt?.txExecutionResultName??receipt?.tx_execution_result_name??receipt?.execution_result??leaderReceipt?.execution_result;
+  if(status!=='FINALIZED') return {status:'UNRESOLVED',reason:`Not finalized (${status ?? 'unknown status'})`};
+  if(result&& !['MAJORITY_AGREE','AGREE'].includes(result)) return {status:'FAILED',reason:`Finalized without accepted equivalence consensus (${result})`};
+  if(!['FINISHED_WITH_RETURN','SUCCESS'].includes(execution)) {
+    const status=execution==='FINISHED_WITH_ERROR'||execution==='ERROR'||execution==='FAILURE'?'FAILED':'UNRESOLVED';
+    return {status,reason:`Finalized without a confirmed successful contract return (${execution ?? 'execution result unavailable'})`};
+  }
   return {status:'FINALIZED',reason:'Finalized with contract return; verify application state separately.'};
 }
 
