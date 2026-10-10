@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectWallet, normalizeChainId, STUDIONET_CHAIN_ID, switchToStudioNet } from '../../studio-wallet.js';
-import { WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, confirmed } from '../../studio-e2e-policy.js';
+import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, confirmed } from '../../studio-e2e-policy.js';
 
 test('normalizes hex and decimal chain IDs', () => {
   assert.equal(normalizeChainId('0xf22f'), STUDIONET_CHAIN_ID);
@@ -45,6 +45,11 @@ test('write allowlist excludes every disabled AI method', () => {
     assert.equal(WRITES.has(name),false);
     assert.equal(VIEWS.has(name),false);
   }
+  for (const name of ['observe_nominated_target','observe_evidence','observe_evidence_pair','assess_supplemental_continuity']) {
+    assert.equal(E2E_WRITES.has(name),false);
+  }
+  assert.deepEqual([...E2E_WRITES].filter((name)=>!WRITES.has(name)).sort(),['freeze_evidence','freeze_inspection','verify_evidence_provenance']);
+  assert.equal(VIEWS.has('get_evidence_verification_status'),true);
 });
 
 test('canceling confirmation never invokes the write callback', async () => {
@@ -63,10 +68,44 @@ test('confirmed dialog invokes its write callback exactly once', async () => {
 
 test('E2E dependent steps stay locked until every earlier step is verified', () => {
   const state={steps:Object.fromEntries(E2E_ORDER.map((key)=>[key,{status:'PASS'}]))};
+  assert.equal(stepUnlocked({steps:{connect:{status:'PASS'},network:{status:'LOCKED'}}},'network'),true);
   assert.equal(stepUnlocked(state,'property'),true);
   state.steps.unit.status='LOCKED';
   assert.equal(stepUnlocked(state,'tenancy'),false);
   assert.equal(stepUnlocked(state,'unit'),true);
+  state.steps.unit.status='PASS';
+  assert.equal(stepUnlocked(state,'evidence'),true);
+  state.steps.freezeEvidence.status='LOCKED';
+  assert.equal(stepUnlocked(state,'freezeInspection'),false);
+});
+
+test('refresh restoration preserves chain records and requires wallet reconnect and network recheck', () => {
+  const fresh={version:2,runId:'FRESH',ids:{},steps:Object.fromEntries(E2E_ORDER.map((key)=>[key,{status:'LOCKED'}]))};
+  const saved={version:2,runId:'SAVED',ids:{property_id:'PROP-1'},steps:Object.fromEntries(E2E_ORDER.map((key)=>[key,{status:'PASS',hash:`0x${key}`}]))};
+  const restored=restoreE2EState(saved,fresh);
+  assert.equal(restored.runId,'SAVED');
+  assert.equal(restored.ids.property_id,'PROP-1');
+  assert.equal(restored.steps.property.hash,'0xproperty');
+  assert.equal(restored.steps.property.status,'RECHECKING');
+  assert.equal(restored.steps.connect.status,'READY');
+  assert.equal(restored.steps.network.status,'READY');
+  assert.equal(stepUnlocked(restored,'network'),false);
+  assert.equal(stepUnlocked(restored,'property'),false);
+  restored.steps.connect.status='PASS';
+  assert.equal(stepUnlocked(restored,'network'),true);
+  restored.steps.network.status='PASS';
+  restored.steps.property.status='PASS';
+  assert.equal(stepUnlocked(restored,'property'),true);
+});
+
+test('legacy E2E progress preserves identifiers but requires the new photo verification before final readback', () => {
+  const fresh={version:2,runId:'FRESH',ids:{},steps:Object.fromEntries(E2E_ORDER.map((key)=>[key,{status:'LOCKED'}]))};
+  const saved={runId:'OLD',ids:{property_id:'PROP-OLD'},steps:Object.fromEntries(['connect','network','property','unit','tenancy','inspection','room','area','inclusion','condition','readback'].map((key)=>[key,{status:'PASS',hash:`0x${key}`}]))};
+  const restored=restoreE2EState(saved,fresh);
+  assert.equal(restored.ids.property_id,'PROP-OLD');
+  assert.equal(restored.steps.evidence.status,'LOCKED');
+  assert.equal(restored.steps.readback.status,'READY');
+  assert.equal(restored.steps.connect.status,'READY');
 });
 
 test('E2E requires finality and successful execution before state verification', () => {

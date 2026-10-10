@@ -1,3 +1,5 @@
+import { createDemoPhotoRecord, validateDemoPhoto } from './demo-photo-policy.js';
+
 (() => {
   'use strict';
 
@@ -244,7 +246,7 @@
     const photos = area.photos.length ? `<div class="photo-list">${area.photos.map((photo) => `<article class="photo-card"><img data-photo="${escapeText(photo.id)}" alt="${escapeText(photo.name)}"><div class="photo-caption"><strong title="${escapeText(photo.name)}">${escapeText(photo.name)}</strong><span>${dateText(photo.createdAt, true)}</span><button class="remove-button" data-remove-photo="${escapeText(photo.id)}" type="button">Remove</button></div></article>`).join('')}</div>` : '<p class="photo-empty">No photographs attached to this area yet.</p>';
     return `<div class="area-top"><div><p class="eyebrow">INSPECTION AREA</p><h2>${escapeText(area.name)}</h2><p>${area.conditions.length} condition notes · ${area.photos.length} photographs</p></div><button class="area-delete" data-delete-area="${escapeText(area.id)}" type="button">Remove area</button></div>
       <section class="content-section"><h3>Record a visible condition</h3><p class="section-help">Write what you can see. These are your notes, not an AI or legal assessment.</p><form id="condition-form" class="condition-form"><select class="field-select" id="condition-category" aria-label="Condition category"><option>General condition</option><option>Walls</option><option>Floor</option><option>Ceiling</option><option>Windows & doors</option><option>Fixtures</option><option>Other</option></select><input class="field-input" id="condition-note" maxlength="500" placeholder="Describe the visible condition…" required><button class="button button-dark button-small" type="submit">Add note</button></form><div class="condition-list">${conditions}</div></section>
-      <section class="content-section"><h3>Photographic evidence</h3><p class="section-help">Photos remain in this browser profile. Do not add sensitive images to a shared device.</p><div class="photo-drop"><p>Attach JPG, PNG, WebP, or HEIC photographs to this area.</p><label class="button button-outline button-small" for="photo-input">＋ Add photographs</label><input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple></div>${photos}</section>`;
+      <section class="content-section"><h3>Photographic evidence</h3><p class="section-help">Photos remain in this browser profile. Do not add sensitive images to a shared device.</p><div class="photo-drop"><p>Attach JPG, PNG, WebP, or HEIC photographs to this area.</p><button class="button button-outline button-small" id="photo-select-button" type="button">＋ Add photographs</button><input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></div>${photos}</section>`;
   }
 
   function renderPhotoPreviews(area) {
@@ -315,12 +317,13 @@
   async function addPhotos(input) {
     const files = Array.from(input.files || []);
     if (!files.length) return;
-    if (files.some((file) => !file.type.startsWith('image/'))) { notify('Please select image files only.'); input.value = ''; return; }
-    if (files.some((file) => file.size > 15 * 1024 * 1024)) { notify('Each photograph must be 15 MB or smaller.'); input.value = ''; return; }
+    if (files.some((file) => validateDemoPhoto(file) === 'UNSUPPORTED_TYPE')) { notify('Please select a JPEG, PNG, WebP, HEIC, or HEIF photograph.'); input.value = ''; return; }
+    if (files.some((file) => validateDemoPhoto(file) === 'INVALID_SIZE')) { notify('The selected photograph is empty or has an invalid size.'); input.value = ''; return; }
+    if (files.some((file) => validateDemoPhoto(file) === 'TOO_LARGE')) { notify('Each photograph must be 15 MB or smaller.'); input.value = ''; return; }
     const record = await getInspection(currentId);
     const area = record.areas.find((entry) => entry.id === activeAreaId);
     if (!area) return;
-    for (const file of files) area.photos.push({ id: uid(), name: file.name, type: file.type || 'application/octet-stream', size: file.size, blob: file, createdAt: Date.now() });
+    for (const file of files) area.photos.push(createDemoPhotoRecord(file, { id: uid(), createdAt: Date.now() }));
     try { await saveInspection(record); await renderInspection(); notify(`${files.length} ${files.length === 1 ? 'photograph' : 'photographs'} attached.`); }
     catch { notify('The browser could not store these photographs. Try fewer or smaller files.'); }
     input.value = '';
@@ -419,6 +422,7 @@
       else if (photo) await removePhoto(photo.dataset.removePhoto);
       else if (area) await removeArea(area.dataset.deleteArea);
       else if (event.target.id === 'first-area') setAreaForm(true);
+      else if (event.target.closest('#photo-select-button')) $('photo-input').click();
     });
     window.addEventListener('hashchange', renderHashRoute);
   }

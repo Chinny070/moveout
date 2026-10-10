@@ -2,8 +2,8 @@ import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { TransactionStatus } from 'genlayer-js/types';
 import { connectWallet, normalizeChainId, switchToStudioNet, STUDIONET_CHAIN_ID } from './studio-wallet.js';
-import { WRITES, VIEWS, submitOnlyWhenConfirmed } from './studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, confirmed as confirmE2E } from './studio-e2e-policy.js';
+import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from './studio-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, confirmed as confirmE2E } from './studio-e2e-policy.js';
 
 const RPC = 'https://studio.genlayer.com/api';
 const CONTRACT = '0x4F96B354b19541F7087b73c548Dc2db380e09b77';
@@ -22,24 +22,35 @@ let account = null;
 let correctChain = false;
 let busy = false;
 const E2E_KEY = 'moveout-studionet-e2e-v1';
+const PUBLIC_SAMPLE_URL = 'https://raw.githubusercontent.com/Chinny070/moveout/8fa5bcbcc4918b28b5ba95ef431542a8d40fb128/benchmarks/stage3-fixtures/sample-photo.jpg';
+const PUBLIC_SAMPLE_SHA256 = 'c9fcb81c83df208461db666064921602aef4a89fd118879528ea34c46b53d12a';
 const E2E_NAMES = {
   connect:'Connect wallet', network:'Verify wallet network', property:'Create test property', unit:'Register test unit',
   tenancy:'Create test tenancy', inspection:'Create MOVE_IN inspection', room:'Add test room', area:'Add inspection area',
-  inclusion:'Include area in inspection', condition:'Record manual condition note', readback:'Retrieve and verify records on-chain',
+  inclusion:'Include area in inspection', condition:'Record manual condition note', evidence:'Register public test photograph',
+  freezeEvidence:'Freeze photograph evidence', freezeInspection:'Freeze inspection record',
+  verifyEvidence:'Verify photograph bytes on StudioNet', readback:'Verify inspection records on-chain',
 };
 function newE2E() {
   const suffix=crypto.randomUUID().slice(0,8).toUpperCase();
-  return { runId:suffix, propertyLabel:`MoveOut StudioNet Test Property ${suffix}`, unitLabel:`Test Apartment ${suffix}`,
+  return { version:2, runId:suffix, propertyLabel:`MoveOut StudioNet Test Property ${suffix}`, unitLabel:`Test Apartment ${suffix}`,
     roomLabel:`Living Room ${suffix}`, areaLabel:`Living Room Wall ${suffix}`,
     conditionText:'Small mark on living room wall, recorded for workflow testing only.',
+    evidenceUrl:PUBLIC_SAMPLE_URL,evidenceSha256:PUBLIC_SAMPLE_SHA256,
     tenantAddress:'', managerAddress:'', ids:{}, steps:Object.fromEntries(E2E_ORDER.map((key)=>[key,{status:'LOCKED'}])) };
 }
 function loadE2E() {
-  try { const saved=JSON.parse(sessionStorage.getItem(E2E_KEY)??'null'); return saved?.steps && saved?.runId ? saved : newE2E(); }
+  try {
+    const saved=JSON.parse(localStorage.getItem(E2E_KEY)??sessionStorage.getItem(E2E_KEY)??'null');
+    const state=restoreE2EState(saved,newE2E());
+    state.evidenceUrl=PUBLIC_SAMPLE_URL;
+    state.evidenceSha256=PUBLIC_SAMPLE_SHA256;
+    return state;
+  }
   catch { return newE2E(); }
 }
 let e2e=loadE2E();
-function saveE2E() { sessionStorage.setItem(E2E_KEY,JSON.stringify(e2e)); }
+function saveE2E() { localStorage.setItem(E2E_KEY,JSON.stringify(e2e)); }
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -129,14 +140,18 @@ function e2eCard(key, methodNames, params, expected) {
     area:'Add an inspection area to the test room.',
     inclusion:'Link the inspection area to the test inspection.',
     condition:'Record a manual participant note. This is not an AI finding or a liability decision.',
-    readback:'Read each finalized test record again and verify its identifier and parent links.'
+    evidence:'Register the existing public sample JPEG URL and frozen SHA-256. No private photo is uploaded.',
+    freezeEvidence:'Freeze the submitted evidence record so its source and digest cannot be changed.',
+    freezeInspection:'Freeze the inspection manifest after its room, target area, note, and photograph are present.',
+    verifyEvidence:'Ask StudioNet validators to independently fetch the public JPEG and check its SHA-256.',
+    readback:'Read the finalized property, inspection, note, evidence, and provenance records again from StudioNet.'
   }[key];
   const buttonHtml=canAct?`<button class="button ${key==='connect'?'button-outline':'button-dark'} button-small" data-action="e2e-${esc(key)}">${actionLabel}</button>`:'';
   const statusClass=status==='PASS'?'pass':status==='FAILED'||status==='REJECTED'||status==='UNRESOLVED'?'fail':'';
   return `<article class="e2e-step ${statusClass}"><div class="e2e-step-head"><span class="e2e-step-number">${E2E_ORDER.indexOf(key)+1}</span><div class="e2e-step-title"><h3>${esc(E2E_NAMES[key])}</h3><p>${esc(guidance)}</p></div><span class="e2e-status ${statusClass}" data-e2e-status="${key}">${esc(status)}</span></div><details class="e2e-result"><summary>What this step verifies</summary><p>${esc(expected)}</p></details>${e2e.steps[key]?.hash?`<p class="e2e-hash">Transaction: <code>${esc(e2e.steps[key].hash)}</code><br>Status: ${esc(e2e.steps[key].receiptStatus??status)}</p>`:''}${e2e.steps[key]?.message?`<p class="e2e-message">${esc(e2e.steps[key].message)}</p>`:''}${buttonHtml}</article>`;
 }
 function e2ePanel() {
-  const prefix=`Run ${e2e.runId}; fictional test records are permanent contract records. No photos or AI methods are involved.`;
+  const prefix=`Run ${e2e.runId}; fictional test records are permanent contract records. The sample photograph is already public; private photographs and AI assessment methods are not used.`;
   return `<section class="e2e-panel"><div class="studio-card-head"><div><p class="eyebrow">OWNER-APPROVED TRANSACTION TEST</p><h2>MoveOut — Live StudioNet Test</h2></div><span class="e2e-tag">Live contract · No mock responses</span></div><p class="studio-caution">${esc(prefix)} Each write opens a separate app confirmation and wallet approval. Canceling does not submit. Never approve unless the wallet shows StudioNet and you have reviewed the transaction.</p><div class="e2e-records"><label class="write-field">Test property label<input class="field-input" readonly value="${esc(e2e.propertyLabel)}"></label><label class="write-field">Test unit label<input class="field-input" readonly value="${esc(e2e.unitLabel)}"></label><label class="write-field">Test room label<input class="field-input" readonly value="${esc(e2e.roomLabel)}"></label><label class="write-field">Test inspection area<input class="field-input" readonly value="${esc(e2e.areaLabel)}"></label><label class="write-field">Designated tenant test address<input class="field-input" data-e2e-tenant value="${esc(e2e.tenantAddress)}" placeholder="Enter a second test account address (not the manager)"></label></div><div class="e2e-steps">
   ${e2eCard('connect','EIP-1193 eth_requestAccounts','Explicit browser-wallet account request','A public wallet address is returned; no key material is requested.')}
   ${e2eCard('network','eth_chainId','Expected chain ID 61999','Connected wallet is on StudioNet 61999.')}
@@ -148,13 +163,27 @@ function e2ePanel() {
   ${e2eCard('area','create_area_item',JSON.stringify({room_id:e2e.ids.room_id??'from step 6',subject_type:'SURFACE',label:e2e.areaLabel,description_ref:'Fictional E2E inspection target',request_id:'unique per test action'}),'An inspection area item linked to the test room.')}
   ${e2eCard('inclusion','include_area_in_inspection',JSON.stringify({inspection_id:e2e.ids.inspection_id??'from step 5',area_item_id:e2e.ids.area_item_id??'from step 6',request_id:'unique per test action'}),'The new area is listed in the test inspection.')}
   ${e2eCard('condition','create_condition_record',JSON.stringify({inspection_id:e2e.ids.inspection_id??'from step 5',area_item_id:e2e.ids.area_item_id??'from step 6',condition_type:'MAINTENANCE_NOTE',description:e2e.conditionText,claim_ref:'',request_id:'unique per test action'}),'A participant-recorded workflow note appears in the inspection; not an AI finding or liability assessment.')}
-  ${e2eCard('readback','get_property, get_unit, get_tenancy, get_inspection, get_room, get_area_item, get_condition_record','Read finalized state for each created record','Every returned record matches expected IDs, parents and test labels.')}
+  <div class="e2e-sample"><p class="eyebrow">PUBLIC TEST PHOTOGRAPH</p><p><a href="${PUBLIC_SAMPLE_URL}" target="_blank" rel="noopener noreferrer">View the existing sample bedroom JPEG (8,858 bytes)</a></p><code>SHA-256 ${PUBLIC_SAMPLE_SHA256}</code><p>This commit-pinned project fixture was already publicly hosted for provenance testing. The contract stores this URL and digest, not the image bytes.</p></div>
+  ${e2eCard('evidence','submit_evidence',JSON.stringify({inspection_id:e2e.ids.inspection_id??'from step 5',area_item_id:e2e.ids.area_item_id??'from step 6',condition_record_id:e2e.ids.condition_record_id??'from step 10',evidence_type:'PHOTO',source_ref:PUBLIC_SAMPLE_URL,expected_sha256:PUBLIC_SAMPLE_SHA256,supersedes_evidence_id:'',request_id:'unique per test action'}),'The contract stores the public URL, digest, and parent IDs as SUBMITTED photo evidence.')}
+  ${e2eCard('freezeEvidence','freeze_evidence',JSON.stringify({evidence_id:e2e.ids.evidence_id??'from photograph registration'}),'The exact photo metadata record is FROZEN.')}
+  ${e2eCard('freezeInspection','freeze_inspection',JSON.stringify({inspection_id:e2e.ids.inspection_id??'from step 5'}),'The inspection manifest is FROZEN with all evidence and area links committed.')}
+  ${e2eCard('verifyEvidence','verify_evidence_provenance',JSON.stringify({tenancy_id:e2e.ids.tenancy_id??'from step 5',evidence_id:e2e.ids.evidence_id??'from photograph registration',request_id:'unique per test action'}),'A finalized validator-side retrieval record reports VERIFIED with the expected SHA-256.')}
+  ${e2eCard('readback','get_property, get_unit, get_tenancy, get_inspection, get_room, get_area_item, get_condition_record, get_evidence, get_evidence_verification_status','Read finalized state for each created record','Every returned record, parent link, frozen status, source URL, digest, and provenance result matches the prepared test data.')}
+  <button class="button button-outline button-small" data-action="e2e-recheck" type="button">Recheck saved on-chain progress</button>
   </div></section>`;
 }
 
 function saveStep(key,status,details={}) { e2e.steps[key]={...(e2e.steps[key]??{}),status,...details}; saveE2E(); }
 function sameAddress(a,b) { return typeof a==='string'&&typeof b==='string'&&a.toLowerCase()===b.toLowerCase(); }
 function lookup(list, predicate) { return paged(list).find(predicate) ?? null; }
+function fieldLabel(name) {
+  const labels={property_label:'Test property',unit_label:'Test unit',tenant_address:'Test tenant wallet',
+    inspection_type:'Inspection type',room_label:'Test room',label:'Inspection area',description:'Manual condition note',
+    evidence_type:'Evidence type',source_ref:'Public photograph source',expected_sha256:'Expected SHA-256',
+    evidence_id:'Evidence record',inspection_id:'Inspection record',tenancy_id:'Tenancy record',
+    area_item_id:'Inspection area record',condition_record_id:'Condition note record',supersedes_evidence_id:'Superseded evidence'};
+  return labels[name]??name.replaceAll('_',' ').replace(/\b\w/g,(letter)=>letter.toUpperCase());
+}
 function stepPrerequisite(key) {
   if(!stepUnlocked(e2e,key)) throw new Error(`Complete and verify the previous step before ${E2E_NAMES[key]}.`);
   if(key!=='connect'&&key!=='network'&&(!account||!correctChain)) throw new Error('Connect a wallet on StudioNet 61999 first.');
@@ -163,7 +192,8 @@ function stepPrerequisite(key) {
 function confirmationDialog(key,methodName,args) {
   return new Promise((resolve)=>{
     const dialog=document.createElement('dialog'); dialog.className='dialog e2e-confirm';
-    dialog.innerHTML=`<form method="dialog"><div class="dialog-top"><div><p class="eyebrow">LIVE STUDIONET TRANSACTION</p><h2>Review before wallet approval</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p><b>Test step:</b> ${esc(E2E_NAMES[key])}<br><b>Network:</b> StudioNet · 61999<br><b>Wallet:</b> ${esc(account)}<br><b>Contract:</b> ${CONTRACT}<br><b>Method:</b> ${esc(methodName)}</p><pre class="e2e-args">${esc(JSON.stringify(args,null,2))}</pre><p class="privacy-hint">This creates permanent test data. The next step stays locked until the transaction is FINALIZED, execution returned successfully, and an actual contract view confirms the expected record. Never re-submit an uncertain transaction.</p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Cancel</button><button class="button button-dark" value="confirm">Continue to wallet approval</button></div></form>`;
+    const summary=Object.entries(args).filter(([name])=>name!=='request_id').map(([name,value])=>`<div><dt>${esc(fieldLabel(name))}</dt><dd>${esc(value===''?'None':value)}</dd></div>`).join('');
+    dialog.innerHTML=`<form method="dialog"><div class="dialog-top"><div><p class="eyebrow">LIVE STUDIONET TRANSACTION</p><h2>Review before wallet approval</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p><b>Action:</b> ${esc(E2E_NAMES[key])}<br><b>Network:</b> StudioNet · 61999<br><b>Wallet:</b> ${esc(account)}<br><b>Contract:</b> ${CONTRACT}<br><b>Value:</b> 0 GEN</p><dl class="e2e-transaction-fields">${summary}</dl><details class="e2e-technical"><summary>Advanced transaction details</summary><p>Contract method: <code>${esc(methodName)}</code></p><pre class="e2e-args">${esc(JSON.stringify(args,null,2))}</pre></details><p class="privacy-hint">This creates permanent test data. The next step stays locked until the transaction is FINALIZED, execution returned successfully, and an actual contract view confirms the expected record. Never re-submit an uncertain transaction.</p><div class="dialog-actions"><button class="button button-quiet" value="cancel">Cancel</button><button class="button button-dark" value="confirm">Continue to wallet approval</button></div></form>`;
     document.body.append(dialog);
     dialog.addEventListener('close',()=>{const action=dialog.returnValue;dialog.remove();resolve(action);},{once:true});
     dialog.showModal();
@@ -172,7 +202,7 @@ function confirmationDialog(key,methodName,args) {
 async function e2eWrite(key,methodName,values,verify) {
   try {
     stepPrerequisite(key);
-    if(!WRITES.has(methodName)) throw new Error(`${methodName} is not an enabled write method.`);
+    if(!E2E_WRITES.has(methodName)) throw new Error(`${methodName} is not an enabled guided test method.`);
     if(!writer) throw new Error('Wallet-backed GenLayer client is not connected.');
     const currentChain=normalizeChainId(await window.ethereum.request({method:'eth_chainId'}));
     if(currentChain!==STUDIONET_CHAIN_ID) throw new Error(`Wallet changed network to ${currentChain}; transaction was not prepared.`);
@@ -204,6 +234,72 @@ async function e2eWrite(key,methodName,values,verify) {
     saveStep(key,'PASS',{hash,receiptStatus:`FINALIZED / ${receipt.txExecutionResultName} / ${consensus}`,message:result.message??'Finalized and matched to a contract view.'});
     await loadHome();
   } catch(error) { saveStep(key,'FAILED',{message:errorText(error)});await loadHome(); }
+}
+
+function verifiedEvidenceStatus(status) {
+  const latest=status?.latest;
+  return Boolean(status?.historically_verified && latest?.outcome==='VERIFIED' &&
+    latest?.expected_sha256===PUBLIC_SAMPLE_SHA256 && latest?.retrieved_sha256===PUBLIC_SAMPLE_SHA256);
+}
+async function readbackRecords() {
+  const [property,unit,tenancy,inspection,room,area,condition,evidence,verification,completeness]=await Promise.all([
+    read('get_property',{property_id:e2e.ids.property_id}),read('get_unit',{unit_id:e2e.ids.unit_id}),
+    read('get_tenancy',{tenancy_id:e2e.ids.tenancy_id}),read('get_inspection',{inspection_id:e2e.ids.inspection_id}),
+    read('get_room',{room_id:e2e.ids.room_id}),read('get_area_item',{area_item_id:e2e.ids.area_item_id}),
+    read('get_condition_record',{condition_record_id:e2e.ids.condition_record_id}),read('get_evidence',{evidence_id:e2e.ids.evidence_id}),
+    read('get_evidence_verification_status',{evidence_id:e2e.ids.evidence_id}),
+    read('get_inspection_completeness',{inspection_id:e2e.ids.inspection_id}),
+  ]);
+  const checks=[
+    matchesRecord(property,{property_id:e2e.ids.property_id,property_label:e2e.propertyLabel})&&sameAddress(property.creator,e2e.managerAddress),
+    matchesRecord(unit,{unit_id:e2e.ids.unit_id,property_id:e2e.ids.property_id,unit_label:e2e.unitLabel}),
+    matchesRecord(tenancy,{tenancy_id:e2e.ids.tenancy_id,property_id:e2e.ids.property_id,unit_id:e2e.ids.unit_id,status:'DRAFT'})&&sameAddress(tenancy.tenant,e2e.tenantAddress),
+    matchesRecord(inspection,{inspection_id:e2e.ids.inspection_id,tenancy_id:e2e.ids.tenancy_id,inspection_type:'MOVE_IN',status:'FROZEN'}),
+    matchesRecord(room,{room_id:e2e.ids.room_id,unit_id:e2e.ids.unit_id,room_label:e2e.roomLabel}),
+    matchesRecord(area,{area_item_id:e2e.ids.area_item_id,room_id:e2e.ids.room_id,label:e2e.areaLabel}),
+    matchesRecord(condition,{condition_record_id:e2e.ids.condition_record_id,inspection_id:e2e.ids.inspection_id,area_item_id:e2e.ids.area_item_id,condition_type:'MAINTENANCE_NOTE',description:e2e.conditionText}),
+    matchesRecord(evidence,{evidence_id:e2e.ids.evidence_id,inspection_id:e2e.ids.inspection_id,area_item_id:e2e.ids.area_item_id,condition_record_id:e2e.ids.condition_record_id,evidence_type:'PHOTO',source_ref:PUBLIC_SAMPLE_URL,expected_sha256:PUBLIC_SAMPLE_SHA256,status:'FROZEN'}),
+    verifiedEvidenceStatus(verification),
+    completeness?.complete===true&&completeness?.frozen===true,
+  ];
+  return {ok:checks.every(Boolean),checks,property,unit,tenancy,inspection,room,area,condition,evidence,verification,completeness};
+}
+async function verifySavedStep(key,cache=new Map()) {
+  const id=e2e.ids;
+  const get=(name,args)=>{const key=`${name}:${JSON.stringify(args)}`;if(!cache.has(key))cache.set(key,read(name,args));return cache.get(key);};
+  if(key==='property') { const r=await get('get_property',{property_id:id.property_id});return matchesRecord(r,{property_id:id.property_id,property_label:e2e.propertyLabel})&&sameAddress(r.creator,e2e.managerAddress); }
+  if(key==='unit') return matchesRecord(await get('get_unit',{unit_id:id.unit_id}),{unit_id:id.unit_id,property_id:id.property_id,unit_label:e2e.unitLabel});
+  if(key==='tenancy') { const r=await get('get_tenancy',{tenancy_id:id.tenancy_id});return matchesRecord(r,{tenancy_id:id.tenancy_id,property_id:id.property_id,unit_id:id.unit_id,status:'DRAFT'})&&sameAddress(r.tenant,e2e.tenantAddress); }
+  if(key==='inspection') return matchesRecord(await get('get_inspection',{inspection_id:id.inspection_id}),{inspection_id:id.inspection_id,tenancy_id:id.tenancy_id,inspection_type:'MOVE_IN'});
+  if(key==='room') return matchesRecord(await get('get_room',{room_id:id.room_id}),{room_id:id.room_id,unit_id:id.unit_id,room_label:e2e.roomLabel});
+  if(key==='area') return matchesRecord(await get('get_area_item',{area_item_id:id.area_item_id}),{area_item_id:id.area_item_id,room_id:id.room_id,label:e2e.areaLabel});
+  if(key==='inclusion') { const r=await get('get_inspection',{inspection_id:id.inspection_id});return Array.isArray(r.area_item_ids)&&r.area_item_ids.includes(id.area_item_id); }
+  if(key==='condition') return matchesRecord(await get('get_condition_record',{condition_record_id:id.condition_record_id}),{condition_record_id:id.condition_record_id,inspection_id:id.inspection_id,area_item_id:id.area_item_id,condition_type:'MAINTENANCE_NOTE',description:e2e.conditionText});
+  if(key==='evidence'||key==='freezeEvidence') {
+    const r=await get('get_evidence',{evidence_id:id.evidence_id});
+    return matchesRecord(r,{evidence_id:id.evidence_id,inspection_id:id.inspection_id,area_item_id:id.area_item_id,source_ref:PUBLIC_SAMPLE_URL,expected_sha256:PUBLIC_SAMPLE_SHA256})&&(key!=='freezeEvidence'||r.status==='FROZEN');
+  }
+  if(key==='freezeInspection') { const [r,c]=await Promise.all([get('get_inspection',{inspection_id:id.inspection_id}),get('get_inspection_completeness',{inspection_id:id.inspection_id})]);return r.status==='FROZEN'&&c?.complete===true; }
+  if(key==='verifyEvidence') return verifiedEvidenceStatus(await get('get_evidence_verification_status',{evidence_id:id.evidence_id}));
+  return false;
+}
+async function recheckSavedProgress({automatic=false}={}) {
+  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&['PASS','RECHECKING'].includes(e2e.steps[key]?.status));
+  if(!keys.length){if(!automatic)alert('No finalized StudioNet test steps are saved to recheck. No transaction was sent.');return;}
+  if(!automatic)alert('Re-reading saved records from finalized StudioNet state. No transaction will be sent.');
+  let chainVerified=true;
+  const cache=new Map();
+  for(const key of keys){
+    let ok=false;
+    try { ok=chainVerified&&Boolean(e2e.steps[key]?.hash)&&await verifySavedStep(key,cache); } catch { ok=false; }
+    if(!ok){chainVerified=false;saveStep(key,'UNRESOLVED',{message:'Could not independently confirm this saved step from the current finalized contract view. Check its transaction hash; do not resubmit.'});}
+    else saveStep(key,'PASS',{message:'Re-read and matched the finalized contract record after page refresh.'});
+  }
+  if(['PASS','RECHECKING'].includes(e2e.steps.readback?.status)){
+    const allExpected=E2E_ORDER.slice(2,E2E_ORDER.indexOf('readback')).every(key=>e2e.steps[key]?.status==='PASS');
+    saveStep('readback',chainVerified&&allExpected?'PASS':'UNRESOLVED',{message:chainVerified&&allExpected?'All finalized records and validator provenance were re-read and matched after refresh.':'One or more records failed re-verification. Inspect the recorded hashes; do not resubmit a write.'});
+  }
+  await loadHome();
 }
 
 async function runE2EStep(key) {
@@ -257,33 +353,42 @@ async function runE2EStep(key) {
       if(!found)return {ok:false,reason:'list_condition_records did not return the expected manual note'};
       return {ok:true,ids:{condition_record_id:found.condition_record_id},message:`Verified participant note ${found.condition_record_id}.`};
     });
+    if(key==='evidence') return e2eWrite(key,'submit_evidence',{inspection_id:e2e.ids.inspection_id,area_item_id:e2e.ids.area_item_id,condition_record_id:e2e.ids.condition_record_id,evidence_type:'PHOTO',source_ref:PUBLIC_SAMPLE_URL,expected_sha256:PUBLIC_SAMPLE_SHA256,supersedes_evidence_id:'',request_id:rid()},async()=>{
+      const found=lookup(await read('list_evidence',{inspection_id:e2e.ids.inspection_id,offset:0,limit:50}),r=>r.area_item_id===e2e.ids.area_item_id&&r.condition_record_id===e2e.ids.condition_record_id&&r.evidence_type==='PHOTO'&&r.source_ref===PUBLIC_SAMPLE_URL&&r.expected_sha256===PUBLIC_SAMPLE_SHA256);
+      if(!found)return {ok:false,reason:'list_evidence did not return the expected public sample metadata'};
+      return {ok:true,ids:{evidence_id:found.evidence_id},message:`Verified submitted evidence ${found.evidence_id}; no image bytes were placed on-chain.`};
+    });
+    if(key==='freezeEvidence') return e2eWrite(key,'freeze_evidence',{evidence_id:e2e.ids.evidence_id},async()=>{
+      const found=await read('get_evidence',{evidence_id:e2e.ids.evidence_id});
+      if(!matchesRecord(found,{evidence_id:e2e.ids.evidence_id,source_ref:PUBLIC_SAMPLE_URL,expected_sha256:PUBLIC_SAMPLE_SHA256,status:'FROZEN'}))return {ok:false,reason:'get_evidence did not return the frozen sample record'};
+      return {ok:true,message:`Evidence ${e2e.ids.evidence_id} is frozen.`};
+    });
+    if(key==='freezeInspection') return e2eWrite(key,'freeze_inspection',{inspection_id:e2e.ids.inspection_id},async()=>{
+      const [inspection,completeness]=await Promise.all([read('get_inspection',{inspection_id:e2e.ids.inspection_id}),read('get_inspection_completeness',{inspection_id:e2e.ids.inspection_id})]);
+      if(inspection.status!=='FROZEN'||completeness?.complete!==true)return {ok:false,reason:'The frozen inspection or completeness view did not confirm the complete evidence manifest'};
+      return {ok:true,message:'The finalized inspection and evidence manifest are frozen and complete.'};
+    });
+    if(key==='verifyEvidence') return e2eWrite(key,'verify_evidence_provenance',{tenancy_id:e2e.ids.tenancy_id,evidence_id:e2e.ids.evidence_id,request_id:rid()},async()=>{
+      const status=await read('get_evidence_verification_status',{evidence_id:e2e.ids.evidence_id});
+      if(!verifiedEvidenceStatus(status))return {ok:false,reason:`The validator-side retrieval record is not VERIFIED for the expected digest (${status?.latest?.outcome??'no result'}).`};
+      return {ok:true,ids:{verification_id:status.latest.verification_id},message:`Validators verified retrieved SHA-256 ${status.latest.retrieved_sha256}.`};
+    });
     if(key==='readback') {
       stepPrerequisite(key);saveStep(key,'IN_PROGRESS',{message:'Reading finalized records from StudioNet.'});await loadHome();
-      const [property,unit,tenancy,inspection,room,area,condition]=await Promise.all([
-        read('get_property',{property_id:e2e.ids.property_id}),read('get_unit',{unit_id:e2e.ids.unit_id}),
-        read('get_tenancy',{tenancy_id:e2e.ids.tenancy_id}),read('get_inspection',{inspection_id:e2e.ids.inspection_id}),
-        read('get_room',{room_id:e2e.ids.room_id}),read('get_area_item',{area_item_id:e2e.ids.area_item_id}),
-        read('get_condition_record',{condition_record_id:e2e.ids.condition_record_id}),
-      ]);
-      const checks=[
-        matchesRecord(property,{property_id:e2e.ids.property_id,property_label:e2e.propertyLabel})&&sameAddress(property.creator,account),
-        matchesRecord(unit,{unit_id:e2e.ids.unit_id,property_id:e2e.ids.property_id,unit_label:e2e.unitLabel}),
-        matchesRecord(tenancy,{tenancy_id:e2e.ids.tenancy_id,property_id:e2e.ids.property_id,unit_id:e2e.ids.unit_id,status:'DRAFT'})&&sameAddress(tenancy.tenant,e2e.tenantAddress),
-        matchesRecord(inspection,{inspection_id:e2e.ids.inspection_id,tenancy_id:e2e.ids.tenancy_id,inspection_type:'MOVE_IN'}),
-        matchesRecord(room,{room_id:e2e.ids.room_id,unit_id:e2e.ids.unit_id,room_label:e2e.roomLabel}),
-        matchesRecord(area,{area_item_id:e2e.ids.area_item_id,room_id:e2e.ids.room_id,label:e2e.areaLabel}),
-        matchesRecord(condition,{condition_record_id:e2e.ids.condition_record_id,inspection_id:e2e.ids.inspection_id,area_item_id:e2e.ids.area_item_id,condition_type:'MAINTENANCE_NOTE',description:e2e.conditionText}),
-      ];
-      if(checks.some(ok=>!ok)){saveStep(key,'FAILED',{message:`Readback mismatch. Per-record matches: ${checks.map(String).join(', ')}.`});await loadHome();return;}
-      saveStep(key,'PASS',{message:'All seven finalized records matched their identifiers, parent links and expected values.'});await loadHome();return;
+      const result=await readbackRecords();
+      if(!result.ok){saveStep(key,'UNRESOLVED',{message:`Finalized state did not match all prepared records: ${result.checks.map((ok,i)=>`${i+1}:${ok?'ok':'mismatch'}`).join(', ')}. No write was retried.`});await loadHome();return;}
+      saveStep(key,'PASS',{message:'All property, unit, tenancy, inspection, room, area, note, evidence, and validator provenance records matched finalized state.'});await loadHome();return;
     }
-  } catch(error) { saveStep(key,'FAILED',{message:errorText(error)});await loadHome(); }
+  } catch(error) { saveStep(key,key==='readback'?'UNRESOLVED':'FAILED',{message:errorText(error)});await loadHome(); }
 }
 
 async function loadHome() {
   renderFrame(`${e2ePanel()}<div class="studio-toolbar"><label>Public owner address<input id="property-owner" class="field-input" placeholder="0x…" value="${esc(account ?? '')}"></label>${button('Load properties','properties')}</div><div id="studio-result">${panel('Your contract properties','<p>Enter the creator address and load the actual on-chain property list. No local demo data is shown here.</p>')}</div>`);
   root.querySelector('[data-e2e-tenant]')?.addEventListener('input',(event)=>{e2e.tenantAddress=event.target.value.trim();saveE2E();});
-  root.querySelectorAll('[data-action^="e2e-"]').forEach((button)=>button.addEventListener('click',()=>runE2EStep(button.dataset.action.slice(4))));
+  root.querySelectorAll('[data-action^="e2e-"]').forEach((button)=>button.addEventListener('click',()=>{
+    const action=button.dataset.action.slice(4);
+    if(action==='recheck') recheckSavedProgress(); else runE2EStep(action);
+  }));
   root.querySelector('[data-action="properties"]').onclick = () => loadProperties(root.querySelector('#property-owner').value);
   root.querySelector('#property-owner').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadProperties(e.currentTarget.value); });
 }
@@ -440,8 +545,9 @@ async function enterStudio() {
     reader=createClient({chain:studionet,endpoint:RPC});
     schema=await reader.getContractSchema(CONTRACT);
     const names=new Set(Object.keys(schema.methods));
-    for(const n of ['list_properties','get_property','get_unit','get_inspection','list_inspection_area_items','list_condition_records','list_evidence']) if(!names.has(n)) throw new Error(`Deployed schema is missing required read method ${n}.`);
+    for(const n of ['list_properties','get_property','get_unit','get_tenancy','get_inspection','get_room','get_area_item','get_condition_record','get_evidence','get_evidence_verification_status','get_inspection_completeness','list_inspection_area_items','list_condition_records','list_evidence']) if(!names.has(n)) throw new Error(`Deployed schema is missing required read method ${n}.`);
     await loadHome();
+    await recheckSavedProgress({automatic:true});
   } catch(error) { renderNotReady(errorText(error)); }
 }
 function enterDemo() { root.classList.add('hidden'); demoRoot.classList.remove('hidden'); modeStudio.classList.remove('active'); modeDemo.classList.add('active'); topNew.classList.remove('hidden'); document.querySelector('#top-connect')?.classList.remove('hidden'); footerMode.textContent='Demo Mode · Local browser data · No blockchain or AI activity'; document.querySelector('.chain-chip')?.classList.remove('visible'); document.querySelectorAll('.side-link.active,.mobile-navigation .active').forEach((el)=>el.classList.remove('active')); document.querySelectorAll('[data-local-nav="overview"]').forEach((el)=>el.classList.add('active')); document.querySelectorAll('[data-mode-studio]').forEach((el)=>el.classList.remove('active')); }
