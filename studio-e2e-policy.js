@@ -52,6 +52,10 @@ export function canRecoverFailedTenancy(step) {
   return Boolean(step?.hash && step.status === 'FAILED');
 }
 
+export function canRecoverFailedArea(step) {
+  return Boolean(step?.hash && step.status === 'FAILED');
+}
+
 export function findMatchingDraftTenancy(records, expected) {
   if (!Array.isArray(records)) return null;
   const matches = records.filter((record) =>
@@ -63,6 +67,21 @@ export function findMatchingDraftTenancy(records, expected) {
     record.tenant.toLowerCase() === expected.tenant.toLowerCase() &&
     typeof record?.manager_creator === 'string' && typeof expected.manager === 'string' &&
     record.manager_creator.toLowerCase() === expected.manager.toLowerCase()
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
+export function findMatchingAreaItem(records, expected) {
+  if (!Array.isArray(records)) return null;
+  const matches = records.filter((record) =>
+    record?.room_id === expected.room_id &&
+    record?.property_id === expected.property_id &&
+    record?.unit_id === expected.unit_id &&
+    record?.subject_type === expected.subject_type &&
+    record?.label === expected.label &&
+    record?.description_ref === expected.description_ref &&
+    typeof record?.created_by === 'string' && typeof expected.creator === 'string' &&
+    record.created_by.toLowerCase() === expected.creator.toLowerCase()
   );
   return matches.length === 1 ? matches[0] : null;
 }

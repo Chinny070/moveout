@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectWallet, normalizeChainId, STUDIONET_CHAIN_ID, switchToStudioNet } from '../../studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, findMatchingDraftTenancy, confirmed } from '../../studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, canRecoverFailedArea, findMatchingDraftTenancy, findMatchingAreaItem, confirmed } from '../../studio-e2e-policy.js';
 
 test('normalizes hex and decimal chain IDs', () => {
   assert.equal(normalizeChainId('0xf22f'), STUDIONET_CHAIN_ID);
@@ -117,6 +117,18 @@ test('failed tenancy can be recovered only from one exact matching finalized-vie
   assert.equal(findMatchingDraftTenancy([{...record,start_metadata:'another run'}],expected),null);
   assert.equal(findMatchingDraftTenancy([{...record,status:'CANCELLED'}],expected),null);
   assert.equal(findMatchingDraftTenancy([record,{...record,tenancy_id:'TEN-2'}],expected),null);
+});
+
+test('failed area step is eligible only for exact unique record recovery after receipt verification', () => {
+  const expected={room_id:'ROOM-1',property_id:'PROP-3',unit_id:'UNIT-1',subject_type:'SURFACE',label:'Living Room Wall 00C0B4E3',description_ref:'Fictional E2E inspection target',creator:'0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b'};
+  const record={area_item_id:'AREA-1',...expected,created_by:expected.creator.toUpperCase()};
+  assert.equal(canRecoverFailedArea({status:'FAILED',hash:'0xconfirmed-tx'}),true);
+  assert.equal(canRecoverFailedArea({status:'FAILED'}),false);
+  assert.equal(findMatchingAreaItem([record],expected)?.area_item_id,'AREA-1');
+  assert.equal(findMatchingAreaItem([{...record,label:'different target'}],expected),null);
+  assert.equal(findMatchingAreaItem([{...record,room_id:'ROOM-OTHER'}],expected),null);
+  assert.equal(findMatchingAreaItem([record,{...record,area_item_id:'AREA-2'}],expected),null);
+  assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_AGREE',consensus_data:{leader_receipt:[{mode:'leader',execution_result:'SUCCESS'}]}}).status,'FINALIZED');
 });
 
 test('legacy E2E progress preserves identifiers but requires the new photo verification before final readback', () => {

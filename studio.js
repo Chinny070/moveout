@@ -3,7 +3,7 @@ import { studionet } from 'genlayer-js/chains';
 import { TransactionStatus } from 'genlayer-js/types';
 import { connectWallet, normalizeChainId, switchToStudioNet, STUDIONET_CHAIN_ID } from './studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from './studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, findMatchingDraftTenancy, confirmed as confirmE2E } from './studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, canRecoverFailedArea, findMatchingDraftTenancy, findMatchingAreaItem, confirmed as confirmE2E } from './studio-e2e-policy.js';
 
 const RPC = 'https://studio.genlayer.com/api';
 const CONTRACT = '0x4F96B354b19541F7087b73c548Dc2db380e09b77';
@@ -305,7 +305,7 @@ async function verifySavedStep(key,cache=new Map()) {
   return false;
 }
 async function recheckSavedProgress({automatic=false}={}) {
-  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&(isRecheckCandidate(e2e.steps[key])||(key==='tenancy'&&canRecoverFailedTenancy(e2e.steps[key]))));
+  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&(isRecheckCandidate(e2e.steps[key])||(key==='tenancy'&&canRecoverFailedTenancy(e2e.steps[key]))||(key==='area'&&canRecoverFailedArea(e2e.steps[key]))));
   if(!keys.length){if(!automatic)alert('No finalized StudioNet test steps are saved to recheck. No transaction was sent.');return;}
   if(!automatic)alert('Re-reading saved records from finalized StudioNet state. No transaction will be sent.');
   let chainVerified=true;
@@ -315,6 +315,40 @@ async function recheckSavedProgress({automatic=false}={}) {
     let receiptStatus;
     try {
       const step=e2e.steps[key];
+      if(key==='area'&&canRecoverFailedArea(step)) {
+        try {
+          const receipt=await reader.waitForTransactionReceipt({hash:step.hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000});
+          const outcome=classifyReceipt(receipt);
+          const summary=receiptSummary(receipt);
+          const receiptStatus=`${summary.status} / ${summary.execution} / ${summary.consensus}`;
+          if(outcome.status!=='FINALIZED') {
+            saveStep(key,outcome.status,{receiptStatus,message:`Saved transaction did not finalize with a successful contract return: ${outcome.reason}. No transaction was sent.`});
+            chainVerified=false;
+            continue;
+          }
+          const records=paged(await read('list_area_items',{room_id:e2e.ids.room_id,offset:0,limit:50}));
+          const record=findMatchingAreaItem(records,{
+            room_id:e2e.ids.room_id,
+            property_id:e2e.ids.property_id,
+            unit_id:e2e.ids.unit_id,
+            subject_type:'SURFACE',
+            label:e2e.areaLabel,
+            description_ref:'Fictional E2E inspection target',
+            creator:e2e.managerAddress,
+          });
+          if(record) {
+            e2e.ids.area_item_id=record.area_item_id;
+            saveStep(key,'PASS',{receiptStatus,message:`Verified finalized area ${record.area_item_id} from the on-chain room record. No transaction was sent.`});
+          } else {
+            saveStep(key,'FAILED',{receiptStatus,message:'The transaction succeeded, but no unique area record matched this run’s room, label, type, description, and creator. No transaction was sent.'});
+            chainVerified=false;
+          }
+        } catch(error) {
+          saveStep(key,'FAILED',{message:`Read-only area recovery could not complete: ${errorText(error)}. Retry the recheck later; no transaction was sent.`});
+          chainVerified=false;
+        }
+        continue;
+      }
       if(key==='tenancy'&&canRecoverFailedTenancy(step)) {
         try {
           const records=paged(await read('list_tenancies',{property_id:e2e.ids.property_id,offset:0,limit:50}));
