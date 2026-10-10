@@ -372,7 +372,7 @@ async function recheckSavedProgress({automatic=false}={}) {
         }
         continue;
       }
-      let finalized=Boolean(step?.hash);
+      let finalized=Boolean(step?.hash||(key==='tenancy'&&step?.recoveredFromHash));
       if(finalized&&step.status==='UNRESOLVED') {
         const receipt=await reader.waitForTransactionReceipt({hash:step.hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000});
         const outcome=classifyReceipt(receipt);

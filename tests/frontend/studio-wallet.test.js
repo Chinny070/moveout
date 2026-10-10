@@ -117,6 +117,7 @@ test('failed tenancy can be recovered only from one exact matching finalized-vie
   assert.equal(findMatchingDraftTenancy([{...record,start_metadata:'another run'}],expected),null);
   assert.equal(findMatchingDraftTenancy([{...record,status:'CANCELLED'}],expected),null);
   assert.equal(findMatchingDraftTenancy([record,{...record,tenancy_id:'TEN-2'}],expected),null);
+  assert.equal(isRecheckCandidate({status:'RECHECKING',recoveredFromHash:'0xold-failure'}),true);
 });
 
 test('failed area step is eligible only for exact unique record recovery after receipt verification', () => {

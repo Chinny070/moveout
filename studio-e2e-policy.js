@@ -45,7 +45,7 @@ export function stepUnlocked(state, step) {
 }
 
 export function isRecheckCandidate(step) {
-  return Boolean(step?.hash && ['PASS', 'RECHECKING', 'UNRESOLVED'].includes(step.status));
+  return Boolean((step?.hash || step?.recoveredFromHash) && ['PASS', 'RECHECKING', 'UNRESOLVED'].includes(step.status));
 }
 
 export function canRecoverFailedTenancy(step) {
