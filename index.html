@@ -6,47 +6,73 @@
   <meta name="theme-color" content="#f5f5f0">
   <title>MoveOut — Property inspection demo</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <script src="app.js" type="module"></script>
 </head>
 <body>
+  <aside class="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#home" aria-label="MoveOut home"><span class="brand-mark" aria-hidden="true">⌂</span><span>MoveOut</span></a>
+    <nav class="side-nav">
+      <a class="side-link active" href="#home" data-local-nav="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></svg>Overview</a>
+      <a class="side-link" href="#properties" data-local-nav="properties"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16M2 21h20M8 7h2m4 0h2M8 11h2m4 0h2M10 21v-5h4v5"/></svg>Properties</a>
+      <a class="side-link" href="#inspections" data-local-nav="inspections"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v5h5M10 12h6m-6 4h6"/></svg>Inspections</a>
+      <a class="side-link" href="#evidence" data-local-nav="evidence"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 15-5-5L5 20"/></svg>Evidence</a>
+      <a class="side-link" href="#activity" data-local-nav="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Activity</a>
+      <div class="side-divider"></div>
+      <a class="side-link" href="#studio" id="sidebar-studio"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="m7 7 3 3m7-3-3 3m-7 7 3-3m7 3-3-3"/></svg>StudioNet Tests</a>
+      <a class="side-link" href="#settings" data-local-nav="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.1.9-1.1 1.9-1.4-.5a8 8 0 0 1-1.7 1l-.2 1.5h-2.2l-.3-1.5a8 8 0 0 1-1.7-1l-1.4.5-1.1-1.9 1.1-.9a7 7 0 0 1 0-2l-1.1-.9 1.1-1.9 1.4.5a8 8 0 0 1 1.7-1l.3-1.5h2.2l.2 1.5a8 8 0 0 1 1.7 1l1.4-.5 1.1 1.9-1.1.9a7 7 0 0 1 0 2z" transform="translate(-1 -1)"/></svg>Settings</a>
+    </nav>
+    <div class="sidebar-note"><span class="sidebar-dot"></span><div><strong>Private by default</strong><small>Demo records stay in this browser</small></div></div>
+  </aside>
   <header class="topbar">
-    <a class="brand" href="#home" aria-label="MoveOut home">
-      <span class="brand-mark" aria-hidden="true">M</span>
-      <span>moveout<span class="brand-period">.</span></span>
-    </a>
-    <div class="demo-pill"><span></span> DEMO MODE <span class="pill-note">Local only · Not on-chain</span></div>
-    <button class="button button-quiet top-new" id="top-new" type="button">＋ New inspection</button>
+    <a class="brand mobile-brand" href="#home" aria-label="MoveOut home"><span class="brand-mark" aria-hidden="true">⌂</span><span>MoveOut</span></a>
+    <label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Search properties, inspections, or units…" aria-label="Search inspections"></label>
+    <div class="topbar-right">
+      <nav class="mode-switch" aria-label="Workspace mode"><button id="mode-demo" class="mode-button active" type="button">Demo</button><button id="mode-studio" class="mode-button" type="button">StudioNet</button></nav>
+      <span class="chain-chip"><i></i> Chain ID 61999</span>
+      <button class="button button-dark top-new" id="top-new" type="button">＋ New inspection</button>
+      <button class="button button-outline top-connect" id="top-connect" type="button">Connect wallet</button>
+      <span class="avatar" aria-hidden="true">MO</span>
+    </div>
   </header>
-
+  <nav class="mobile-navigation" aria-label="Workspace navigation">
+    <a class="active" href="#home" data-local-nav="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></svg><small>Overview</small></a>
+    <a href="#properties" data-local-nav="properties"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16M2 21h20M8 7h2m4 0h2M8 11h2m4 0h2M10 21v-5h4v5"/></svg><small>Properties</small></a>
+    <a href="#inspections" data-local-nav="inspections"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v5h5M10 12h6m-6 4h6"/></svg><small>Inspections</small></a>
+    <a href="#evidence" data-local-nav="evidence"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 15-5-5L5 20"/></svg><small>Evidence</small></a>
+    <a href="#activity" data-local-nav="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><small>Activity</small></a>
+    <a href="#studio" data-mode-studio><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><path d="m7 7 3 3m7-3-3 3"/></svg><small>StudioNet</small></a>
+  </nav>
   <main id="app" class="shell">
     <section id="home-view" class="view">
       <div class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">PROPERTY RECORDS, MADE CLEAR</p>
-          <h1>Keep a clear record<br>of every room.</h1>
-          <p class="hero-text">Create an inspection, note visible conditions, and keep the photographs together. Your demo records stay in this browser.</p>
-          <button class="button button-dark" id="start-inspection" type="button">Start an inspection <span aria-hidden="true">→</span></button>
+          <h1>Welcome to MoveOut</h1>
+          <p class="hero-text">Property inspections made simple, secure, and transparent.</p>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="art-sun"></div>
-          <div class="art-window"><i></i><i></i><i></i><i></i></div>
-          <div class="art-wall"></div><div class="art-floor"></div>
-          <div class="art-plant"><i></i><i></i><i></i><b></b></div>
-          <div class="art-card"><span class="tiny-check">✓</span><span><b>Inspection ready</b><small>Every detail in one place</small></span></div>
-        </div>
+        <button class="button button-dark hero-new" id="start-inspection" type="button"><span aria-hidden="true">＋</span> New inspection</button>
       </div>
-      <div class="section-heading">
-        <div><p class="eyebrow">YOUR WORKSPACE</p><h2>Recent inspections</h2></div>
-        <span class="count-label" id="inspection-count">0 inspections</span>
-      </div>
-      <div id="inspection-list" class="inspection-list"></div>
-      <div id="empty-state" class="empty-state">
-        <div class="empty-icon">⌂</div><h3>Your first inspection starts here</h3>
-        <p>Set up a property and add rooms. Your notes and photos will stay together in this browser.</p>
-        <button class="button button-outline" id="empty-new" type="button">Create an inspection</button>
+      <section class="stats-grid" aria-label="Workspace summary">
+        <article class="stat-card"><span class="stat-icon stat-green">⌂</span><div><small>Total Properties</small><strong id="stat-properties">0</strong><span>From your local inspections</span></div></article>
+        <article class="stat-card"><span class="stat-icon stat-blue">▤</span><div><small>Total Inspections</small><strong id="stat-inspections">0</strong><span>Saved in this browser</span></div></article>
+        <article class="stat-card"><span class="stat-icon stat-amber">◷</span><div><small>In progress</small><strong id="stat-progress">0</strong><span>Still being documented</span></div></article>
+        <article class="stat-card"><span class="stat-icon stat-green">✓</span><div><small>Review complete</small><strong id="stat-complete">0</strong><span>Marked complete by you</span></div></article>
+      </section>
+      <div class="dashboard-columns">
+        <section class="dashboard-panel property-panel">
+          <div class="section-heading"><div><p class="eyebrow">YOUR WORKSPACE</p><h2>Your Properties</h2></div><button class="text-button" data-workspace="properties" type="button">View all →</button></div>
+          <div id="property-list" class="property-grid"></div>
+          <div id="property-empty" class="compact-empty"><span class="compact-empty-icon">⌂</span><strong>No properties yet</strong><p>Create an inspection to start a property record in this browser.</p><button class="button button-outline button-small" type="button" data-new-inspection>Create your first inspection</button></div>
+        </section>
+        <section class="dashboard-panel inspections-panel" id="section-heading-anchor">
+          <div class="section-heading"><div><p class="eyebrow">YOUR WORKSPACE</p><h2>Recent Inspections</h2></div><span class="count-label" id="inspection-count">0 inspections</span></div>
+          <div id="inspection-list" class="inspection-list"></div>
+          <div id="empty-state" class="compact-empty"><span class="compact-empty-icon">▤</span><strong>Your first inspection starts here</strong><p>Your notes and photographs stay together in this browser.</p><button class="button button-outline button-small" id="empty-new" type="button">Create an inspection</button></div>
+        </section>
       </div>
       <aside class="notice"><span class="notice-icon">i</span><p><strong>Demo Mode.</strong> Records and photos are saved locally in this browser. They are not sent to GenLayer, stored on-chain, assessed by AI, or shared with anyone.</p></aside>
     </section>
+
+    <section id="workspace-view" class="view hidden" aria-live="polite"></section>
 
     <section id="inspection-view" class="view hidden" aria-live="polite">
       <button class="back-link" id="back-home" type="button">← All inspections</button>
@@ -55,6 +81,7 @@
         <div class="header-actions"><span id="status-badge" class="status-badge">IN PROGRESS</span><button id="complete-inspection" class="button button-outline" type="button">Mark review complete</button></div>
       </div>
       <div class="progress-strip"><div><strong id="area-total">0</strong><span>areas</span></div><div><strong id="condition-total">0</strong><span>condition notes</span></div><div><strong id="photo-total">0</strong><span>photos</span></div></div>
+      <div id="inspection-progress" class="inspection-progress" aria-label="Inspection progress"></div>
       <div class="work-grid">
         <aside class="area-panel">
           <div class="panel-title"><h2>Inspection areas</h2><button id="add-area" class="icon-button" type="button" aria-label="Add area">＋</button></div>
@@ -71,6 +98,7 @@
       </div>
     </section>
   </main>
+  <main id="studio-app" class="shell hidden" aria-live="polite"></main>
 
   <dialog id="new-inspection-dialog" class="dialog">
     <form id="inspection-form" method="dialog">
@@ -85,5 +113,6 @@
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <footer><span>MoveOut</span><span>Demo Mode · Local browser data · No blockchain or AI activity</span></footer>
+  <script type="module" src="/studio.js"></script>
 </body>
 </html>

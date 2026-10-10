@@ -5,8 +5,10 @@
   const STORE = 'inspections';
   const app = document;
   const $ = (id) => app.getElementById(id);
+  const modeStudio = $('mode-studio');
   const homeView = $('home-view');
   const inspectionView = $('inspection-view');
+  const workspaceView = $('workspace-view');
   const list = $('inspection-list');
   const emptyState = $('empty-state');
   const dialog = $('new-inspection-dialog');
@@ -83,7 +85,19 @@
     releasePreviews();
     const records = await allInspections();
     $('inspection-count').textContent = `${records.length} ${records.length === 1 ? 'inspection' : 'inspections'}`;
+    const properties = new Set(records.map((record) => record.propertyName?.trim()).filter(Boolean));
+    $('stat-properties').textContent = properties.size;
+    $('stat-inspections').textContent = records.length;
+    $('stat-progress').textContent = records.filter((record) => record.status !== 'COMPLETE').length;
+    $('stat-complete').textContent = records.filter((record) => record.status === 'COMPLETE').length;
     emptyState.classList.toggle('hidden', records.length > 0);
+    const propertyGroups = groupProperties(records);
+    $('property-empty').classList.toggle('hidden', propertyGroups.length > 0);
+    $('property-list').innerHTML = propertyGroups.slice(0, 3).map(propertyCard).join('');
+    for (const group of propertyGroups.slice(0,3)) {
+      const photo = group.records.flatMap((record) => record.areas.flatMap((area) => area.photos)).find((entry) => entry.blob instanceof Blob);
+      if (photo) { const url = URL.createObjectURL(photo.blob); previewUrls.add(url); const image = $('property-list').querySelector(`[data-property-photo="${CSS.escape(photo.id)}"]`); if (image) image.src = url; }
+    }
     list.innerHTML = records.map((record) => {
       const property = record.propertyName || 'Property inspection';
       const unit = record.unitName ? ` · ${record.unitName}` : '';
@@ -93,10 +107,104 @@
     }).join('');
   }
 
+  function groupProperties(records) {
+    const groups = new Map();
+    for (const record of records) {
+      const name = record.propertyName?.trim();
+      if (!name) continue;
+      if (!groups.has(name)) groups.set(name, { name, records: [] });
+      groups.get(name).records.push(record);
+    }
+    return [...groups.values()];
+  }
+  function propertyCard(group) {
+    const units = new Set(group.records.map((record) => record.unitName?.trim()).filter(Boolean));
+    const photo = group.records.flatMap((record) => record.areas.flatMap((area) => area.photos)).find((entry) => entry.blob instanceof Blob);
+    const cover = photo ? `<img data-property-photo="${escapeText(photo.id)}" alt="Photo from ${escapeText(group.name)} inspection">` : `<div class="property-art"><span>⌂</span><small>No property photo</small></div>`;
+    return `<button class="property-card" type="button" data-property-name="${escapeText(group.name)}"><span class="property-image">${cover}</span><span class="property-card-body"><strong>${escapeText(group.name)}</strong><small>${units.size} ${units.size===1?'unit':'units'} · ${group.records.length} ${group.records.length===1?'inspection':'inspections'}</small><span class="property-active">Local demo record</span></span></button>`;
+  }
+  function compactEmpty(title, description, action='Create an inspection') {
+    return `<div class="large-empty"><span class="large-empty-mark">⌂</span><h2>${escapeText(title)}</h2><p>${escapeText(description)}</p><button class="button button-dark button-small" data-new-inspection>${escapeText(action)}</button></div>`;
+  }
+  function workspaceInspectionCard(record) {
+    const photos=record.areas.reduce((n,area)=>n+area.photos.length,0), notes=record.areas.reduce((n,area)=>n+area.conditions.length,0);
+    return `<button class="workspace-inspection" type="button" data-open="${escapeText(record.id)}"><span class="workspace-inspection-icon">▤</span><span class="workspace-inspection-main"><strong>${escapeText(record.propertyName||'Property inspection')}</strong><small>${escapeText(record.unitName||'Unit not specified')} · ${escapeText(record.dateLabel)} · ${record.areas.length} areas · ${photos} photos · ${notes} notes</small></span><span class="status-badge ${record.status==='COMPLETE'?'complete':''}">${record.status==='COMPLETE'?'REVIEW COMPLETE':'IN PROGRESS'}</span><span class="open-card">›</span></button>`;
+  }
+  async function renderWorkspace(page, propertyName='') {
+    releasePreviews();
+    const records = await allInspections();
+    const properties = groupProperties(records);
+    const title = {properties:'Properties',inspections:'Inspections',evidence:'Evidence',activity:'Activity',settings:'Settings'}[page] || 'Overview';
+    let content = '';
+    if (page === 'properties') {
+      const property = properties.find((entry)=>entry.name===propertyName);
+      if (property) {
+        const units=new Map();
+        for (const record of property.records) { const label=record.unitName?.trim()||'Unit not specified'; if(!units.has(label)) units.set(label,[]); units.get(label).push(record); }
+        const propertyPhoto=property.records.flatMap((record)=>record.areas.flatMap((area)=>area.photos)).find((photo)=>photo.blob instanceof Blob);
+        const cover=propertyPhoto?`<img data-property-photo="${escapeText(propertyPhoto.id)}" alt="Photograph from ${escapeText(property.name)} inspection">`:`<span>⌂</span><small>No property photograph has been added to an inspection.</small>`;
+        content=`<button class="back-link" data-workspace="properties">← All properties</button><section class="property-detail-hero"><div class="property-art property-detail-art">${cover}</div><div><p class="eyebrow">LOCAL DEMO PROPERTY</p><h2>${escapeText(property.name)}</h2><p class="muted">${units.size} ${units.size===1?'unit':'units'} · ${property.records.length} ${property.records.length===1?'inspection':'inspections'}</p><button class="button button-dark button-small" data-add-inspection-for="${escapeText(property.name)}">＋ Add inspection</button></div></section><section class="workspace-section"><div class="section-heading"><h2>Units & inspection history</h2></div><div class="unit-grid">${[...units.entries()].map(([unit,items])=>`<article class="unit-card"><div class="unit-card-top"><span class="unit-icon">▣</span><span class="status-badge ${items[0].status==='COMPLETE'?'complete':''}">${items[0].status==='COMPLETE'?'REVIEW COMPLETE':'IN PROGRESS'}</span></div><h3>${escapeText(unit)}</h3><p>${items.length} ${items.length===1?'inspection':'inspections'}</p>${items.map((record)=>`<button class="history-row" data-open="${escapeText(record.id)}"><span>${escapeText(record.dateLabel)} · ${record.areas.length} areas · ${record.areas.reduce((n,a)=>n+a.photos.length,0)} photos</span><b>Open →</b></button>`).join('')}</article>`).join('')}</div></section>`;
+      } else content=properties.length?`<div class="property-grid property-grid-page">${properties.map(propertyCard).join('')}</div>`:compactEmpty('No properties yet','Create an inspection with a property label. Properties are grouped from your own local inspection records.');
+    } else if (page === 'inspections') {
+      content=records.length?`<div class="workspace-list">${records.map(workspaceInspectionCard).join('')}</div>`:compactEmpty('No inspections yet','Start an inspection to document a property and its rooms.');
+    } else if (page === 'evidence') {
+      const evidence=records.flatMap((record)=>record.areas.flatMap((area)=>[
+        ...area.photos.map((photo)=>({type:'Photograph',title:photo.name,where:`${record.propertyName||'Property inspection'} · ${record.unitName||'Unit not specified'} · ${area.name}`,at:photo.createdAt,record,photo})),
+        ...area.conditions.map((note)=>({type:'Condition note',title:note.category,where:`${record.propertyName||'Property inspection'} · ${record.unitName||'Unit not specified'} · ${area.name}`,at:note.createdAt,record,note}))
+      ])).sort((a,b)=>b.at-a.at);
+      content=evidence.length?`<div class="evidence-grid">${evidence.map((entry)=>`<article class="evidence-card">${entry.photo?`<img data-evidence-photo="${escapeText(entry.photo.id)}" alt="${escapeText(entry.photo.name)}">`:'<span class="evidence-note-icon">✎</span>'}<div><span class="evidence-kind">${entry.type}</span><h3>${escapeText(entry.title)}</h3><p>${escapeText(entry.where)}</p>${entry.note?`<blockquote>${escapeText(entry.note.note)}</blockquote>`:''}<button class="text-button" data-open="${escapeText(entry.record.id)}">Open inspection →</button></div></article>`).join('')}</div>`:compactEmpty('No evidence yet','Photographs and condition notes added in Demo Mode will be collected here.');
+    } else if (page === 'settings') {
+      content=`<div class="settings-grid"><article class="settings-card"><span class="settings-icon">⌂</span><div><h2>Demo data</h2><p>Inspection labels, notes, and photographs created in Demo Mode are stored in this browser profile. They are not uploaded or synchronized with StudioNet.</p><span class="settings-tag">Local browser storage · IndexedDB</span></div></article><article class="settings-card"><span class="settings-icon">◉</span><div><h2>StudioNet connection</h2><p>Live contract records are a separate workspace on GenLayer StudioNet. A wallet is only requested when you choose to connect.</p><button class="button button-outline button-small" data-mode-studio>Open StudioNet Tests</button></div></article><article class="settings-card"><span class="settings-icon">✓</span><div><h2>Inspection safety</h2><p>Demo notes and images are records you enter yourself. MoveOut Demo Mode does not perform AI assessments or determine responsibility.</p></div></article></div>`;
+    } else {
+      const entries=records.flatMap((record)=>[
+        {at:record.createdAt,title:'Inspection created',detail:`${record.propertyName||'Property inspection'} · ${record.unitName||'Unit not specified'}`,record},
+        ...record.areas.flatMap((area)=>[...area.conditions.map((note)=>({at:note.createdAt,title:'Condition note added',detail:`${area.name} · ${note.category}`,record})),...area.photos.map((photo)=>({at:photo.createdAt,title:'Photograph attached',detail:`${area.name} · ${photo.name}`,record}))]),
+        ...(record.status==='COMPLETE'?[{at:record.updatedAt,title:'Review marked complete',detail:record.propertyName||'Property inspection',record}]:[])
+      ]).sort((a,b)=>b.at-a.at);
+      content=entries.length?`<div class="activity-list">${entries.map((entry)=>`<article class="activity-row"><span class="activity-marker"></span><div><strong>${escapeText(entry.title)}</strong><p>${escapeText(entry.detail)}</p><small>${dateText(entry.at,true)}</small></div><button class="text-button" data-open="${escapeText(entry.record.id)}">View →</button></article>`).join('')}</div>`:compactEmpty('No activity yet','Inspection updates made in this browser will appear here.');
+    }
+    workspaceView.innerHTML=`<section class="workspace-page"><div class="workspace-heading"><div><p class="eyebrow">DEMO MODE · THIS BROWSER</p><h1>${title}</h1><p class="muted">${page==='properties'?'Property and unit details are derived from your local inspection labels.':page==='evidence'?'Private photos remain in this browser and are not uploaded.':page==='activity'?'A local history of inspection changes.':page==='settings'?'Local storage and privacy information for this demo.':'All local demo inspections.'}</p></div>${page==='properties'||page==='inspections'?'<button class="button button-dark button-small" data-new-inspection>＋ New inspection</button>':''}</div>${content}</section>`;
+    homeView.classList.add('hidden'); inspectionView.classList.add('hidden'); workspaceView.classList.remove('hidden');
+    for (const image of workspaceView.querySelectorAll('[data-property-photo],[data-evidence-photo]')) { const id=image.dataset.propertyPhoto||image.dataset.evidencePhoto; const photo=records.flatMap((r)=>r.areas.flatMap((a)=>a.photos)).find((p)=>p.id===id); if(photo?.blob instanceof Blob){const url=URL.createObjectURL(photo.blob);previewUrls.add(url);image.src=url;} }
+  }
+
   function switchView(view) {
     homeView.classList.toggle('hidden', view !== 'home');
     inspectionView.classList.toggle('hidden', view !== 'inspection');
+    workspaceView.classList.add('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function renderHashRoute() {
+    const path = location.hash.slice(1);
+    const [rawRoute, ...rawParts] = (path || (new URLSearchParams(location.search).get('mode') === 'studionet' ? 'studio' : 'home')).split('/');
+    const route = decodeURIComponent(rawRoute);
+    const parts = rawParts.map(decodeURIComponent);
+    if (route === 'studio') {
+      if (!modeStudio.classList.contains('active')) modeStudio.click();
+      return;
+    }
+    if (modeStudio.classList.contains('active')) $('mode-demo').click();
+    document.querySelectorAll('.side-link.active,.mobile-navigation .active').forEach((item) => item.classList.remove('active'));
+    const nav = document.querySelector(`[data-local-nav="${CSS.escape(route === 'home' ? 'overview' : route)}"]`);
+    nav?.classList.add('active');
+    if (route === 'inspection' && parts.length) {
+      await showInspection(parts.join('/'));
+    } else if (route === 'properties' && parts.length) {
+      await renderWorkspace('properties', parts.join('/'));
+    } else if (['properties', 'inspections', 'evidence', 'activity', 'settings'].includes(route)) {
+      await renderWorkspace(route);
+    } else {
+      currentId = null;
+      switchView('home');
+      await renderHome();
+    }
+  }
+
+  function navigateHash(route) {
+    const next = `#${route}`;
+    if (location.hash === next) renderHashRoute();
+    else location.hash = route;
   }
 
   async function showInspection(id) {
@@ -124,6 +232,8 @@
     $('area-total').textContent = record.areas.length;
     $('condition-total').textContent = conditionCount;
     $('photo-total').textContent = photoCount;
+    const reviewIndex = record.status === 'COMPLETE' ? 4 : area ? 2 : 1;
+    $('inspection-progress').innerHTML = `<div class="flow-step done"><span>✓</span><small>Property & Unit</small></div><i class="flow-line done"></i><div class="flow-step done"><span>✓</span><small>Inspection Details</small></div><i class="flow-line ${reviewIndex>2?'done':''}"></i><div class="flow-step ${reviewIndex===2?'current':reviewIndex>2?'done':''}"><span>${reviewIndex>2?'✓':'3'}</span><small>Rooms & Areas</small></div><i class="flow-line ${reviewIndex>3?'done':''}"></i><div class="flow-step ${reviewIndex===3?'current':reviewIndex>3?'done':''}"><span>${reviewIndex>3?'✓':'4'}</span><small>Review</small></div><i class="flow-line ${reviewIndex>4?'done':''}"></i><div class="flow-step ${reviewIndex===4?'current':''}"><span>${reviewIndex===4?'✓':'5'}</span><small>Complete</small></div>`;
     $('area-list').innerHTML = record.areas.map((entry) => `<button class="area-item ${entry.id === activeAreaId ? 'active' : ''}" data-area="${escapeText(entry.id)}" type="button"><span class="area-dot"></span><span>${escapeText(entry.name)}</span><span class="area-count">${entry.conditions.length + entry.photos.length || ''}</span></button>`).join('');
     $('area-detail').innerHTML = area ? areaMarkup(area) : `<div class="area-placeholder"><div class="empty-icon">＋</div><h3>Add an area to begin</h3><p>Start with a room, hallway, or outdoor area.</p><button class="button button-outline" id="first-area" type="button">Add first area</button></div>`;
     if (area) renderPhotoPreviews(area);
@@ -159,7 +269,7 @@
     try {
       await saveInspection(record);
       closeDialog();
-      await showInspection(record.id);
+      navigateHash(`inspection/${encodeURIComponent(record.id)}`);
       notify('Inspection created and saved in this browser.');
     } catch { notify('Could not save the inspection. Check browser storage and try again.'); }
   }
@@ -257,20 +367,38 @@
   function wire() {
     $('start-inspection').addEventListener('click', openDialog);
     $('top-new').addEventListener('click', openDialog);
+    $('global-search').addEventListener('input', (event) => {
+      const query = event.target.value.trim().toLocaleLowerCase();
+      for (const card of document.querySelectorAll('.inspection-card,.property-card,.workspace-inspection,.evidence-card,.activity-row')) card.classList.toggle('search-hidden', query && !card.textContent.toLocaleLowerCase().includes(query));
+    });
+    $('sidebar-studio').addEventListener('click', (event) => { event.preventDefault(); $('mode-studio').click(); });
+    document.querySelectorAll('[data-local-nav]').forEach((link) => link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const page=link.dataset.localNav;
+      navigateHash(page === 'overview' ? 'home' : page);
+    }));
+    document.addEventListener('click',(event)=>{
+      if(event.target.closest('[data-mode-studio]')){navigateHash('studio');return;}
+      const card=event.target.closest('[data-property-name]');
+      if(card && !card.closest('#property-list')){navigateHash(`properties/${encodeURIComponent(card.dataset.propertyName)}`);return;}
+      const open=event.target.closest('[data-open]');
+      if(open){navigateHash(`inspection/${encodeURIComponent(open.dataset.open)}`);return;}
+      const workspace=event.target.closest('[data-workspace]');
+      if(workspace){navigateHash(workspace.dataset.workspace);return;}
+      if(event.target.closest('[data-new-inspection]')){openDialog();return;}
+      const add=event.target.closest('[data-add-inspection-for]');
+      if(add){openDialog();$('property-name').value=add.dataset.addInspectionFor;return;}
+    });
     $('empty-new').addEventListener('click', openDialog);
     $('close-dialog').addEventListener('click', closeDialog);
     $('cancel-dialog').addEventListener('click', closeDialog);
     form.addEventListener('submit', createInspection);
-    $('back-home').addEventListener('click', async () => { currentId = null; switchView('home'); await renderHome(); });
+    $('back-home').addEventListener('click', () => navigateHash('home'));
     $('add-area').addEventListener('click', () => setAreaForm(true));
     $('first-area').addEventListener('click', () => setAreaForm(true));
     $('cancel-area').addEventListener('click', () => setAreaForm(false));
     $('area-form').addEventListener('submit', createArea);
     $('complete-inspection').addEventListener('click', toggleComplete);
-    list.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-open]');
-      if (button) await showInspection(button.dataset.open);
-    });
     $('area-list').addEventListener('click', async (event) => {
       const button = event.target.closest('[data-area]');
       if (!button) return;
@@ -292,9 +420,7 @@
       else if (area) await removeArea(area.dataset.deleteArea);
       else if (event.target.id === 'first-area') setAreaForm(true);
     });
-    window.addEventListener('hashchange', async () => {
-      if (location.hash === '#home') { currentId = null; switchView('home'); await renderHome(); }
-    });
+    window.addEventListener('hashchange', renderHashRoute);
   }
 
   async function init() {
@@ -302,7 +428,7 @@
       $('app').innerHTML = '<div class="empty-state"><h3>Local browser storage is unavailable</h3><p>Open MoveOut in a current browser with IndexedDB enabled to use this demo.</p></div>';
       return;
     }
-    try { await openDb(); wire(); await renderHome(); }
+    try { await openDb(); wire(); await renderHashRoute(); }
     catch { $('app').innerHTML = '<div class="empty-state"><h3>Could not open local browser storage</h3><p>Check that site data is enabled for this browser, then reload MoveOut.</p></div>'; }
   }
 
