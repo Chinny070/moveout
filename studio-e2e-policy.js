@@ -56,6 +56,10 @@ export function canRecoverFailedArea(step) {
   return Boolean(step?.hash && ['FAILED', 'REJECTED'].includes(step.status));
 }
 
+export function canRecoverFailedInclusion(step) {
+  return Boolean(step?.hash && ['FAILED', 'REJECTED'].includes(step.status));
+}
+
 export function findMatchingDraftTenancy(records, expected) {
   if (!Array.isArray(records)) return null;
   const matches = records.filter((record) =>

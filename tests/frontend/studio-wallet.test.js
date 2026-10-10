@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectWallet, normalizeChainId, STUDIONET_CHAIN_ID, switchToStudioNet } from '../../studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, canRecoverFailedArea, findMatchingDraftTenancy, findMatchingAreaItem, confirmed } from '../../studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, canRecoverFailedArea, canRecoverFailedInclusion, findMatchingDraftTenancy, findMatchingAreaItem, confirmed } from '../../studio-e2e-policy.js';
 
 test('normalizes hex and decimal chain IDs', () => {
   assert.equal(normalizeChainId('0xf22f'), STUDIONET_CHAIN_ID);
@@ -132,6 +132,13 @@ test('failed area step is eligible only for exact unique record recovery after r
   assert.equal(findMatchingAreaItem([{...record,room_id:'ROOM-OTHER'}],expected),null);
   assert.equal(findMatchingAreaItem([record,{...record,area_item_id:'AREA-2'}],expected),null);
   assert.equal(classifyReceipt({status_name:'FINALIZED',result_name:'MAJORITY_AGREE',consensus_data:{leader_receipt:[{mode:'leader',execution_result:'SUCCESS'}]}}).status,'FINALIZED');
+});
+
+test('failed or rejected inspection-area inclusion is recoverable only when a prior transaction hash exists', () => {
+  assert.equal(canRecoverFailedInclusion({status:'REJECTED',hash:'0xprior-success'}),true);
+  assert.equal(canRecoverFailedInclusion({status:'FAILED',hash:'0xsubmitted'}),true);
+  assert.equal(canRecoverFailedInclusion({status:'REJECTED'}),false);
+  assert.equal(canRecoverFailedInclusion({status:'PASS',hash:'0xfinalized'}),false);
 });
 
 test('legacy E2E progress preserves identifiers but requires the new photo verification before final readback', () => {
