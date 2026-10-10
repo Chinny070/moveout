@@ -124,6 +124,8 @@ test('failed area step is eligible only for exact unique record recovery after r
   const expected={room_id:'ROOM-1',property_id:'PROP-3',unit_id:'UNIT-1',subject_type:'SURFACE',label:'Living Room Wall 00C0B4E3',description_ref:'Fictional E2E inspection target',creator:'0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b'};
   const record={area_item_id:'AREA-1',...expected,created_by:expected.creator.toUpperCase()};
   assert.equal(canRecoverFailedArea({status:'FAILED',hash:'0xconfirmed-tx'}),true);
+  assert.equal(canRecoverFailedArea({status:'REJECTED',hash:'0xprior-success'}),true);
+  assert.equal(canRecoverFailedArea({status:'REJECTED'}),false);
   assert.equal(canRecoverFailedArea({status:'FAILED'}),false);
   assert.equal(findMatchingAreaItem([record],expected)?.area_item_id,'AREA-1');
   assert.equal(findMatchingAreaItem([{...record,label:'different target'}],expected),null);

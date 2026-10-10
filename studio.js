@@ -158,7 +158,7 @@ function e2eCard(key, methodNames, params, expected) {
   const buttonHtml=canAct?`<button class="button ${key==='connect'?'button-outline':'button-dark'} button-small" data-action="e2e-${esc(key)}">${actionLabel}</button>`:'';
   const statusClass=status==='PASS'?'pass':status==='FAILED'||status==='REJECTED'||status==='UNRESOLVED'?'fail':'';
   const step=e2e.steps[key]??{};
-  const hashes=step.hash?`<p class="e2e-hash">Transaction: <code>${esc(step.hash)}</code><br>Status: ${esc(step.receiptStatus??status)}</p>`:'';
+  const hashes=step.hash?(step.status==='REJECTED'?`<p class="e2e-hash">Prior transaction retained for read-only reconciliation (the rejected wallet request submitted nothing): <code>${esc(step.hash)}</code></p>`:`<p class="e2e-hash">Transaction: <code>${esc(step.hash)}</code><br>Status: ${esc(step.receiptStatus??status)}</p>`):'';
   const recoveredHash=step.recoveredFromHash?`<p class="e2e-hash">Failed attempt (not the recovered record): <code>${esc(step.recoveredFromHash)}</code></p>`:'';
   return `<article class="e2e-step ${statusClass}"><div class="e2e-step-head"><span class="e2e-step-number">${E2E_ORDER.indexOf(key)+1}</span><div class="e2e-step-title"><h3>${esc(E2E_NAMES[key])}</h3><p>${esc(guidance)}</p></div><span class="e2e-status ${statusClass}" data-e2e-status="${key}">${esc(status)}</span></div><details class="e2e-result"><summary>What this step verifies</summary><p>${esc(expected)}</p></details>${hashes}${recoveredHash}${step.message?`<p class="e2e-message">${esc(step.message)}</p>`:''}${buttonHtml}</article>`;
 }
