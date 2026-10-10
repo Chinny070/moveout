@@ -48,6 +48,25 @@ export function isRecheckCandidate(step) {
   return Boolean(step?.hash && ['PASS', 'RECHECKING', 'UNRESOLVED'].includes(step.status));
 }
 
+export function canRecoverFailedTenancy(step) {
+  return Boolean(step?.hash && step.status === 'FAILED');
+}
+
+export function findMatchingDraftTenancy(records, expected) {
+  if (!Array.isArray(records)) return null;
+  const matches = records.filter((record) =>
+    record?.property_id === expected.property_id &&
+    record?.unit_id === expected.unit_id &&
+    record?.status === 'DRAFT' &&
+    record?.start_metadata === expected.start_metadata &&
+    typeof record?.tenant === 'string' && typeof expected.tenant === 'string' &&
+    record.tenant.toLowerCase() === expected.tenant.toLowerCase() &&
+    typeof record?.manager_creator === 'string' && typeof expected.manager === 'string' &&
+    record.manager_creator.toLowerCase() === expected.manager.toLowerCase()
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export function classifyReceipt(receipt) {
   const status=receipt?.statusName??receipt?.status_name;
   const result=receipt?.resultName??receipt?.result_name;

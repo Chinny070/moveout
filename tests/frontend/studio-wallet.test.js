@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectWallet, normalizeChainId, STUDIONET_CHAIN_ID, switchToStudioNet } from '../../studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from '../../studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, confirmed } from '../../studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, findMatchingDraftTenancy, confirmed } from '../../studio-e2e-policy.js';
 
 test('normalizes hex and decimal chain IDs', () => {
   assert.equal(normalizeChainId('0xf22f'), STUDIONET_CHAIN_ID);
@@ -103,6 +103,20 @@ test('unresolved submitted steps with a transaction hash remain eligible for rea
   assert.equal(isRecheckCandidate({status:'PASS',hash:'0xfinalized'}),true);
   assert.equal(isRecheckCandidate({status:'UNRESOLVED'}),false);
   assert.equal(isRecheckCandidate({status:'IN_PROGRESS',hash:'0xmaybe'}),false);
+});
+
+test('failed tenancy can be recovered only from one exact matching finalized-view record', () => {
+  const expected={property_id:'PROP-3',unit_id:'UNIT-1',tenant:'0x1Af111b06E6f6A05Bd41572A016318f1356aF85c',manager:'0xaffe15eec45b68835cc9e5b4ab85dd5deae8e70b',start_metadata:'Fictional MoveOut E2E 00C0B4E3'};
+  const record={tenancy_id:'TEN-1',...expected,tenant:expected.tenant.toLowerCase(),manager_creator:expected.manager,status:'DRAFT'};
+  assert.equal(canRecoverFailedTenancy({status:'FAILED',hash:'0xfailed'}),true);
+  assert.equal(canRecoverFailedTenancy({status:'FAILED'}),false);
+  assert.equal(canRecoverFailedTenancy({status:'UNRESOLVED',hash:'0xsubmitted'}),false);
+  assert.equal(findMatchingDraftTenancy([record],expected)?.tenancy_id,'TEN-1');
+  assert.equal(findMatchingDraftTenancy([{...record,unit_id:'UNIT-OTHER'}],expected),null);
+  assert.equal(findMatchingDraftTenancy([{...record,tenant:'0xother'}],expected),null);
+  assert.equal(findMatchingDraftTenancy([{...record,start_metadata:'another run'}],expected),null);
+  assert.equal(findMatchingDraftTenancy([{...record,status:'CANCELLED'}],expected),null);
+  assert.equal(findMatchingDraftTenancy([record,{...record,tenancy_id:'TEN-2'}],expected),null);
 });
 
 test('legacy E2E progress preserves identifiers but requires the new photo verification before final readback', () => {

@@ -3,7 +3,7 @@ import { studionet } from 'genlayer-js/chains';
 import { TransactionStatus } from 'genlayer-js/types';
 import { connectWallet, normalizeChainId, switchToStudioNet, STUDIONET_CHAIN_ID } from './studio-wallet.js';
 import { WRITES, E2E_WRITES, VIEWS, submitOnlyWhenConfirmed } from './studio-policy.js';
-import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, confirmed as confirmE2E } from './studio-e2e-policy.js';
+import { E2E_ORDER, stepUnlocked, classifyReceipt, matchesRecord, restoreE2EState, isRecheckCandidate, canRecoverFailedTenancy, findMatchingDraftTenancy, confirmed as confirmE2E } from './studio-e2e-policy.js';
 
 const RPC = 'https://studio.genlayer.com/api';
 const CONTRACT = '0x4F96B354b19541F7087b73c548Dc2db380e09b77';
@@ -157,7 +157,10 @@ function e2eCard(key, methodNames, params, expected) {
   }[key];
   const buttonHtml=canAct?`<button class="button ${key==='connect'?'button-outline':'button-dark'} button-small" data-action="e2e-${esc(key)}">${actionLabel}</button>`:'';
   const statusClass=status==='PASS'?'pass':status==='FAILED'||status==='REJECTED'||status==='UNRESOLVED'?'fail':'';
-  return `<article class="e2e-step ${statusClass}"><div class="e2e-step-head"><span class="e2e-step-number">${E2E_ORDER.indexOf(key)+1}</span><div class="e2e-step-title"><h3>${esc(E2E_NAMES[key])}</h3><p>${esc(guidance)}</p></div><span class="e2e-status ${statusClass}" data-e2e-status="${key}">${esc(status)}</span></div><details class="e2e-result"><summary>What this step verifies</summary><p>${esc(expected)}</p></details>${e2e.steps[key]?.hash?`<p class="e2e-hash">Transaction: <code>${esc(e2e.steps[key].hash)}</code><br>Status: ${esc(e2e.steps[key].receiptStatus??status)}</p>`:''}${e2e.steps[key]?.message?`<p class="e2e-message">${esc(e2e.steps[key].message)}</p>`:''}${buttonHtml}</article>`;
+  const step=e2e.steps[key]??{};
+  const hashes=step.hash?`<p class="e2e-hash">Transaction: <code>${esc(step.hash)}</code><br>Status: ${esc(step.receiptStatus??status)}</p>`:'';
+  const recoveredHash=step.recoveredFromHash?`<p class="e2e-hash">Failed attempt (not the recovered record): <code>${esc(step.recoveredFromHash)}</code></p>`:'';
+  return `<article class="e2e-step ${statusClass}"><div class="e2e-step-head"><span class="e2e-step-number">${E2E_ORDER.indexOf(key)+1}</span><div class="e2e-step-title"><h3>${esc(E2E_NAMES[key])}</h3><p>${esc(guidance)}</p></div><span class="e2e-status ${statusClass}" data-e2e-status="${key}">${esc(status)}</span></div><details class="e2e-result"><summary>What this step verifies</summary><p>${esc(expected)}</p></details>${hashes}${recoveredHash}${step.message?`<p class="e2e-message">${esc(step.message)}</p>`:''}${buttonHtml}</article>`;
 }
 function e2ePanel() {
   const prefix=`Run ${e2e.runId}; fictional test records are permanent contract records. The sample photograph is already public; private photographs and AI assessment methods are not used.`;
@@ -302,7 +305,7 @@ async function verifySavedStep(key,cache=new Map()) {
   return false;
 }
 async function recheckSavedProgress({automatic=false}={}) {
-  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&isRecheckCandidate(e2e.steps[key]));
+  const keys=E2E_ORDER.slice(2).filter(key=>key!=='readback'&&(isRecheckCandidate(e2e.steps[key])||(key==='tenancy'&&canRecoverFailedTenancy(e2e.steps[key]))));
   if(!keys.length){if(!automatic)alert('No finalized StudioNet test steps are saved to recheck. No transaction was sent.');return;}
   if(!automatic)alert('Re-reading saved records from finalized StudioNet state. No transaction will be sent.');
   let chainVerified=true;
@@ -312,6 +315,29 @@ async function recheckSavedProgress({automatic=false}={}) {
     let receiptStatus;
     try {
       const step=e2e.steps[key];
+      if(key==='tenancy'&&canRecoverFailedTenancy(step)) {
+        try {
+          const records=paged(await read('list_tenancies',{property_id:e2e.ids.property_id,offset:0,limit:50}));
+          const record=findMatchingDraftTenancy(records,{
+            property_id:e2e.ids.property_id,
+            unit_id:e2e.ids.unit_id,
+            tenant:e2e.tenantAddress,
+            manager:e2e.managerAddress,
+            start_metadata:`Fictional MoveOut E2E ${e2e.runId}`,
+          });
+          if(record) {
+            e2e.ids.tenancy_id=record.tenancy_id;
+            saveStep(key,'PASS',{hash:undefined,recoveredFromHash:step.hash,receiptStatus:'READ-ONLY RECORD RECOVERY',message:`Verified existing DRAFT tenancy ${record.tenancy_id} from the finalized contract view. No transaction was sent.`});
+          } else {
+            saveStep(key,'FAILED',{message:'No unique DRAFT tenancy matched this run’s property, unit, tenant, manager, and run metadata. No transaction was sent; check inputs and retry this read-only recheck.'});
+            chainVerified=false;
+          }
+        } catch(error) {
+          saveStep(key,'FAILED',{message:`Read-only tenancy recovery could not complete: ${errorText(error)}. Retry the recheck later; no transaction was sent.`});
+          chainVerified=false;
+        }
+        continue;
+      }
       let finalized=Boolean(step?.hash);
       if(finalized&&step.status==='UNRESOLVED') {
         const receipt=await reader.waitForTransactionReceipt({hash:step.hash,status:TransactionStatus.FINALIZED,retries:60,interval:5000});
