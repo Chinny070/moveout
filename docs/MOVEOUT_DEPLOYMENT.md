@@ -6,6 +6,7 @@ This document describes the reviewed Vite frontend deployment setup. The website
 
 - GitHub repository: <https://github.com/Chinny070/moveout>
 - Branch: `main`
+- Frontend release commit pushed to `origin/main`: `2cc297f9f8517863f4eb30d2a45fd567e42e5c53`
 - Vercel project: not linked in this checkout (`.vercel/project.json` is absent)
 - Production URL: pending
 
@@ -18,7 +19,7 @@ Vercel should detect Vite from `package.json` and use:
 - Output directory: `dist`
 - Environment variables: none required
 
-The application uses hash-based screen links (`/#properties`, `/#inspections`, and similar), so direct screen links and refreshes are served from the static root without a server-side SPA rewrite. The client stores Demo Mode inspections and photographs in browser IndexedDB; this data is not part of the build artifact. StudioNet reads use the public StudioNet RPC and the deployed contract address below. No private wallet values or API keys are embedded in the frontend.
+The application uses hash-based screen links (`/#properties`, `/#inspections`, and similar), so direct screen links and refreshes are served from the static root without a server-side SPA rewrite. The client stores Demo Mode inspections and photographs in browser IndexedDB; this data is not part of the build artifact. StudioNet reads use the public StudioNet RPC and the deployed contract address below. No private wallet values or API keys are embedded in the frontend. The SDK bundle includes its unused Localnet chain definition with a localhost endpoint, while MoveOut constructs the active client with the explicit public StudioNet endpoint; the application source has no localhost RPC dependency.
 
 ## StudioNet
 
